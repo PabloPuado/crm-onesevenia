@@ -6,6 +6,7 @@ const navItems = [
   { path: '/pipeline', label: 'Pipeline', icon: PipelineIcon },
   { path: '/contactos', label: 'Contactos', icon: PeopleIcon },
   { path: '/tareas', label: 'Tareas', icon: TaskIcon },
+  { path: '/contabilidad', label: 'Contabilidad', icon: ContabilidadIcon },
   { path: '/ingresos', label: 'Ingresos', icon: EuroIcon },
   { path: '/documentos', label: 'Documentos', icon: DocIcon },
   { path: '/objetivos', label: 'Objetivos', icon: TargetIcon },
@@ -25,6 +26,9 @@ function TaskIcon() {
 }
 function EuroIcon() {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><path d="M12 4.5A5 5 0 1 0 12 11.5M2 7h7M2 9h7"/></svg>
+}
+function ContabilidadIcon() {
+  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h2m2 0h2M5 11h1.5M5 5h6"/></svg>
 }
 function DocIcon() {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
