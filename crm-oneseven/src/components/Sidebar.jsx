@@ -56,7 +56,11 @@ export default function Sidebar({ open, onClose }) {
       <div className={`sidebar-overlay ${open ? 'show' : ''}`} onClick={onClose} />
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-text">ONESEVEN IA</div>
+          <img
+            src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png"
+            alt="ONESEVEN IA"
+            style={{ height: 28, objectFit: 'contain', marginBottom: 4 }}
+          />
           <div className="sidebar-logo-sub">CRM · Pipeline</div>
         </div>
 
