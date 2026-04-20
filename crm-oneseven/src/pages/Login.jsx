@@ -7,7 +7,13 @@ export default function Login() {
     <div className="login-page">
       <div className="login-bg" />
       <div className="login-card">
-        <div className="login-logo">ONESEVEN IA</div>
+        <div style={{ marginBottom: 20 }}>
+          <img
+            src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png"
+            alt="ONESEVEN IA"
+            style={{ height: 48, objectFit: 'contain' }}
+          />
+        </div>
         <div className="login-subtitle">CRM · Gestión de clientes</div>
 
         <div style={{ marginBottom: 32 }}>
