@@ -9,6 +9,7 @@ import Tareas from './pages/Tareas'
 import Ingresos from './pages/Ingresos'
 import Documentos from './pages/Documentos'
 import Objetivos from './pages/Objetivos'
+import Contabilidad from './pages/Contabilidad'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ function AppRoutes() {
       <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
       <Route path="/ingresos" element={<ProtectedRoute><Ingresos /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
+      <Route path="/contabilidad" element={<ProtectedRoute><Contabilidad /></ProtectedRoute>} />
       <Route path="/objetivos" element={<ProtectedRoute><Objetivos /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
