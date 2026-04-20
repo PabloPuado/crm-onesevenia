@@ -4,9 +4,13 @@ export const STAGES = [
   { id: 'propuesta', label: 'Propuesta', color: '#f59e0b', badgeClass: 'badge-propuesta' },
   { id: 'negociacion', label: 'Negociación', color: '#a855f7', badgeClass: 'badge-negociacion' },
   { id: 'ganado', label: 'Cerrado ganado', color: '#10b981', badgeClass: 'badge-ganado' },
+  { id: 'desarrollando', label: 'Desarrollando solución', color: '#06b6d4', badgeClass: 'badge-desarrollando' },
+  { id: 'terminado', label: '100% terminado', color: '#8b5cf6', badgeClass: 'badge-terminado' },
   { id: 'perdido', label: 'Cerrado perdido', color: '#ef4444', badgeClass: 'badge-perdido' },
   { id: 'activo', label: 'Cliente activo', color: '#34d399', badgeClass: 'badge-activo' },
 ]
+
+export const ETAPAS_CONTABILIDAD = ['ganado', 'desarrollando', 'terminado', 'activo']
 
 export const SERVICIOS = [
   'Web development',
