@@ -11,7 +11,7 @@ import Documentos from './pages/Documentos'
 import Objetivos from './pages/Objetivos'
 import Contabilidad from './pages/Contabilidad'
 import Timeline from './pages/Timeline'
-import Metricas from './pages/Metricas'
+import Metricas from './pages/Metricas' 
 import BusquedaGlobal from './pages/BusquedaGlobal'
 import Propuestas from './pages/Propuestas'
 
