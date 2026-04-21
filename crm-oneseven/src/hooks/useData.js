@@ -130,11 +130,7 @@ export function useDocumentos() {
     if (uploadError) return { error: uploadError }
     const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
     const { data, error } = await supabase.from('documentos').insert([{
-      nombre: file.name,
-      categoria,
-      url: publicUrl,
-      storage_path: path,
-      tamano: file.size,
+      nombre: file.name, categoria, url: publicUrl, storage_path: path, tamano: file.size,
     }]).select().single()
     if (!error) setDocumentos(prev => [data, ...prev])
     return { data, error }
@@ -148,4 +144,34 @@ export function useDocumentos() {
   }
 
   return { documentos, loading, fetch, subir, eliminar }
+}
+
+export function useActividad(clienteId = null) {
+  const [actividad, setActividad] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    let q = supabase.from('actividad').select('*').order('fecha', { ascending: false })
+    if (clienteId) q = q.eq('cliente_id', clienteId)
+    const { data } = await q
+    setActividad(data || [])
+    setLoading(false)
+  }, [clienteId])
+
+  useEffect(() => { fetch() }, [fetch])
+
+  const crear = async (item) => {
+    const { data, error } = await supabase.from('actividad').insert([item]).select().single()
+    if (!error) setActividad(prev => [data, ...prev])
+    return { data, error }
+  }
+
+  const eliminar = async (id) => {
+    const { error } = await supabase.from('actividad').delete().eq('id', id)
+    if (!error) setActividad(prev => prev.filter(a => a.id !== id))
+    return { error }
+  }
+
+  return { actividad, loading, fetch, crear, eliminar }
 }
