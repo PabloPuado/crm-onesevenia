@@ -13,14 +13,11 @@ import Contabilidad from './pages/Contabilidad'
 import Timeline from './pages/Timeline'
 import Metricas from './pages/Metricas'
 import BusquedaGlobal from './pages/BusquedaGlobal'
+import Propuestas from './pages/Propuestas'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg0)' }}>
-      <div style={{ fontSize: 13, color: 'var(--text3)' }}>Cargando...</div>
-    </div>
-  )
+  if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg0)' }}><div style={{ fontSize: 13, color: 'var(--text3)' }}>Cargando...</div></div>
   if (!user) return <Navigate to="/login" replace />
   return children
 }
@@ -37,6 +34,7 @@ function AppRoutes() {
       <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
       <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
       <Route path="/metricas" element={<ProtectedRoute><Metricas /></ProtectedRoute>} />
+      <Route path="/propuestas" element={<ProtectedRoute><Propuestas /></ProtectedRoute>} />
       <Route path="/busqueda" element={<ProtectedRoute><BusquedaGlobal /></ProtectedRoute>} />
       <Route path="/ingresos" element={<ProtectedRoute><Ingresos /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
