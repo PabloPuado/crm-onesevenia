@@ -10,7 +10,9 @@ export const STAGES = [
   { id: 'activo', label: 'Cliente activo', color: '#34d399', badgeClass: 'badge-activo' },
 ]
 
+
 export const ETAPAS_CONTABILIDAD = ['ganado', 'desarrollando', 'terminado', 'activo']
+
 
 export const SERVICIOS = [
   'Web development',
@@ -21,6 +23,7 @@ export const SERVICIOS = [
   'SEO / Marketing',
   'Otro',
 ]
+
 
 export const ORIGENES = [
   'Instagram',
@@ -33,22 +36,6 @@ export const ORIGENES = [
   'Otro',
 ]
 
+
 export const formatEur = (n) => {
-  if (!n && n !== 0) return '—'
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-}
-
-export const formatDate = (d) => {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-export const getStage = (id) => STAGES.find(s => s.id === id) || STAGES[0]
-
-export const whatsappUrl = (phone, text = '') => {
-  const clean = phone?.replace(/\D/g, '') || ''
-  const encoded = encodeURIComponent(text)
-  return `https://wa.me/${clean}${text ? '?text=' + encoded : ''}`
-}
-
-export const OBJETIVO_ANUAL = 100000
+// v3 - Propuestas generador PDF
