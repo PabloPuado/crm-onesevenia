@@ -10,6 +10,9 @@ import Ingresos from './pages/Ingresos'
 import Documentos from './pages/Documentos'
 import Objetivos from './pages/Objetivos'
 import Contabilidad from './pages/Contabilidad'
+import Timeline from './pages/Timeline'
+import Metricas from './pages/Metricas'
+import BusquedaGlobal from './pages/BusquedaGlobal'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -25,7 +28,6 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user, loading } = useAuth()
   if (loading) return null
-
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
@@ -33,6 +35,9 @@ function AppRoutes() {
       <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
       <Route path="/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
       <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
+      <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
+      <Route path="/metricas" element={<ProtectedRoute><Metricas /></ProtectedRoute>} />
+      <Route path="/busqueda" element={<ProtectedRoute><BusquedaGlobal /></ProtectedRoute>} />
       <Route path="/ingresos" element={<ProtectedRoute><Ingresos /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
       <Route path="/contabilidad" element={<ProtectedRoute><Contabilidad /></ProtectedRoute>} />
