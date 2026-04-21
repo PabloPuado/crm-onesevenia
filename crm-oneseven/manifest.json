@@ -1,0 +1,26 @@
+{
+  "name": "ONESEVEN CRM",
+  "short_name": "OS CRM",
+  "description": "CRM pipeline para ONESEVEN IA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d14",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "es"
+}
