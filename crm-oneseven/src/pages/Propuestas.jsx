@@ -37,7 +37,7 @@ function generarHTMLPropuesta({ p, cliente }) {
   const items = (Array.isArray(p.items) ? p.items : []).filter(it => it.descripcion)
   const total = items.reduce((s, it) => s + (parseFloat(it.precio) || 0), 0)
   const ref = `OS-${new Date(p.fecha || p.created_at).getFullYear()}-${p.id?.slice(-3).toUpperCase() || '000'}`
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Propuesta ${ref}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}.page{max-width:794px;margin:0 auto}.header{background:linear-gradient(135deg,#0a0a1a,#1a1a3e);color:white;padding:48px 56px 40px}.ht{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}.li img{height:36px;filter:brightness(0)invert(1)}.hm{text-align:right;font-size:12px;color:rgba(255,255,255,.5)}.htitle{font-size:22px;font-weight:300;margin-bottom:6px}.hsub{font-size:13px;color:rgba(255,255,255,.6)}.ab{height:4px;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4)}.body{padding:40px 56px}.section{margin-bottom:28px}.st{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#6366f1;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #e8e8f0}.ig{display:grid;grid-template-columns:1fr 1fr;gap:16px}.ib{background:#f8f8ff;border-radius:8px;padding:16px;border-left:3px solid #6366f1}.ib .lb{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:4px}.ib .vl{font-size:14px;font-weight:600;color:#1a1a2e}.ib .sb{font-size:11px;color:#666;margin-top:2px}.intro{font-size:13px;color:#444;line-height:1.8;background:#fafafa;padding:18px;border-radius:8px;border:1px solid #eee}table{width:100%;border-collapse:separate;border-spacing:0}th{background:#1a1a2e;color:white;padding:10px 14px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}th:first-child{border-radius:8px 0 0 0}th:last-child{border-radius:0 8px 0 0;text-align:right}td{padding:12px 14px;border-bottom:1px solid #f0f0f8;vertical-align:top}tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaff}.in{font-weight:600;color:#1a1a2e;margin-bottom:2px}.id{font-size:11px;color:#666}.ip{text-align:right;font-weight:700;color:#1a1a2e;font-size:14px}.tr{background:linear-gradient(135deg,#6366f1,#8b5cf6)}.tr td{padding:14px;font-weight:700;font-size:15px;border:none!important;color:white}.cond{font-size:12px;color:#555;line-height:1.8;white-space:pre-line}.footer{background:#0a0a1a;color:rgba(255,255,255,.5);padding:20px 56px;display:flex;justify-content:space-between;align-items:center;font-size:11px}.topbar{position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:12px}.topbar span{color:rgba(255,255,255,.7);font-size:13px}.topbar button{background:#6366f1;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}.wrapper{padding-top:52px}@media print{.topbar{display:none}.wrapper{padding-top:0}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}@page{margin:0;size:A4}}</style></head><body><div class="topbar"><span>Propuesta ${ref} - ${cliente?.nombre || ''}</span><button onclick="window.print()">Guardar como PDF</button></div><div class="wrapper"><div class="page"><div class="header"><div class="ht"><div class="li"><img src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png" alt="ONESEVEN IA" onerror="this.style.display='none'"></div><div class="hm"><div>${ref}</div><div>${formatDate(p.fecha)}</div></div></div><div class="htitle">${p.titulo}</div><div class="hsub">Para ${cliente?.nombre || ''}${cliente?.empresa ? ' · ' + cliente.empresa : ''}</div></div><div class="ab"></div><div class="body"><div class="section"><div class="st">Informacion</div><div class="ig"><div class="ib"><div class="lb">Destinatario</div><div class="vl">${cliente?.nombre || '-'}</div><div class="sb">${cliente?.empresa || ''}</div>${cliente?.email ? '<div class="sb">' + cliente.email + '</div>' : ''}</div><div class="ib"><div class="lb">Preparada por</div><div class="vl">${respNombre}</div><div class="sb">ONESEVEN IA</div><div class="sb">${respEmail}</div></div></div></div>${p.intro ? '<div class="section"><div class="st">Presentacion</div><div class="intro">' + p.intro + '</div></div>' : ''}<div class="section"><div class="st">Servicios incluidos</div><table><thead><tr><th style="width:70%">Servicio</th><th>Importe</th></tr></thead><tbody>${items.map(it => '<tr><td><div class="in">' + it.descripcion + '</div>' + (it.detalle ? '<div class="id">' + it.detalle + '</div>' : '') + '</td><td class="ip">' + (it.precio ? formatEur(parseFloat(it.precio)) : '-') + '</td></tr>').join('')}<tr class="tr"><td>Total propuesta</td><td style="text-align:right;font-size:18px">${formatEur(total)}</td></tr></tbody></table>${p.validez ? '<p style="font-size:11px;color:#92400e;margin-top:10px">Valida ' + p.validez + ' dias desde la fecha de emision</p>' : ''}</div>${p.condiciones ? '<div class="section"><div class="st">Condiciones</div><div class="cond">' + p.condiciones + '</div></div>' : ''}</div><div class="footer"><div><div style="color:white;font-weight:600;margin-bottom:3px">ONESEVEN IA</div><div>onesevenia.com</div></div><div style="text-align:right"><div style="color:white;font-weight:600;margin-bottom:3px">${respNombre}</div><div>${respEmail}</div></div></div></div></div></body></html>`
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Propuesta ${ref}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}.page{max-width:794px;margin:0 auto}.header{background:linear-gradient(135deg,#0a0a1a,#1a1a3e);color:white;padding:48px 56px 40px}.ht{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}.li img{height:36px;filter:brightness(0)invert(1)}.hm{text-align:right;font-size:12px;color:rgba(255,255,255,.5)}.htitle{font-size:22px;font-weight:300;margin-bottom:6px}.hsub{font-size:13px;color:rgba(255,255,255,.6)}.ab{height:4px;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4)}.body{padding:40px 56px}.section{margin-bottom:28px}.st{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#6366f1;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #e8e8f0}.ig{display:grid;grid-template-columns:1fr 1fr;gap:16px}.ib{background:#f8f8ff;border-radius:8px;padding:16px;border-left:3px solid #6366f1}.ib .lb{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:4px}.ib .vl{font-size:14px;font-weight:600;color:#1a1a2e}.ib .sb{font-size:11px;color:#666;margin-top:2px}.intro{font-size:13px;color:#444;line-height:1.8;background:#fafafa;padding:18px;border-radius:8px;border:1px solid #eee}table{width:100%;border-collapse:separate;border-spacing:0}th{background:#1a1a2e;color:white;padding:10px 14px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}th:first-child{border-radius:8px 0 0 0}th:last-child{border-radius:0 8px 0 0;text-align:right}td{padding:12px 14px;border-bottom:1px solid #f0f0f8;vertical-align:top}tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaff}.in{font-weight:600;color:#1a1a2e;margin-bottom:2px}.id{font-size:11px;color:#666}.ip{text-align:right;font-weight:700;color:#1a1a2e;font-size:14px}.tr{background:linear-gradient(135deg,#6366f1,#8b5cf6)}.tr td{padding:14px;font-weight:700;font-size:15px;border:none!important;color:white}.cond{font-size:12px;color:#555;line-height:1.8;white-space:pre-line}.footer{background:#0a0a1a;color:rgba(255,255,255,.5);padding:20px 56px;display:flex;justify-content:space-between;align-items:center;font-size:11px}.topbar{position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.4)}.back-btn{background:rgba(255,255,255,.1);color:white;border:none;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}.save-btn{background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}.topbar-title{color:rgba(255,255,255,.7);font-size:12px;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wrapper{padding-top:52px}@media print{.topbar{display:none}.wrapper{padding-top:0}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}@page{margin:0;size:A4}}</style></head><body><div class="topbar"><button class="back-btn" onclick="window.close()">&#8592; Cerrar</button><span class="topbar-title">${ref}</span><button class="save-btn" onclick="window.print()">Guardar PDF</button></div><div class="wrapper"><div class="page"><div class="header"><div class="ht"><div class="li"><img src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png" alt="ONESEVEN IA" onerror="this.style.display='none'"></div><div class="hm"><div>${ref}</div><div>${formatDate(p.fecha)}</div></div></div><div class="htitle">${p.titulo}</div><div class="hsub">Para ${cliente?.nombre || ''}${cliente?.empresa ? ' · ' + cliente.empresa : ''}</div></div><div class="ab"></div><div class="body"><div class="section"><div class="st">Informacion</div><div class="ig"><div class="ib"><div class="lb">Destinatario</div><div class="vl">${cliente?.nombre || '-'}</div><div class="sb">${cliente?.empresa || ''}</div>${cliente?.email ? '<div class="sb">' + cliente.email + '</div>' : ''}</div><div class="ib"><div class="lb">Preparada por</div><div class="vl">${respNombre}</div><div class="sb">ONESEVEN IA</div><div class="sb">${respEmail}</div></div></div></div>${p.intro ? '<div class="section"><div class="st">Presentacion</div><div class="intro">' + p.intro + '</div></div>' : ''}<div class="section"><div class="st">Servicios incluidos</div><table><thead><tr><th style="width:70%">Servicio</th><th>Importe</th></tr></thead><tbody>${items.map(it => '<tr><td><div class="in">' + it.descripcion + '</div>' + (it.detalle ? '<div class="id">' + it.detalle + '</div>' : '') + '</td><td class="ip">' + (it.precio ? formatEur(parseFloat(it.precio)) : '-') + '</td></tr>').join('')}<tr class="tr"><td>Total propuesta</td><td style="text-align:right;font-size:18px">${formatEur(total)}</td></tr></tbody></table>${p.validez ? '<p style="font-size:11px;color:#92400e;margin-top:10px">Valida ' + p.validez + ' dias desde la fecha de emision</p>' : ''}</div>${p.condiciones ? '<div class="section"><div class="st">Condiciones</div><div class="cond">' + p.condiciones + '</div></div>' : ''}</div><div class="footer"><div><div style="color:white;font-weight:600;margin-bottom:3px">ONESEVEN IA</div><div>onesevenia.com</div></div><div style="text-align:right"><div style="color:white;font-weight:600;margin-bottom:3px">${respNombre}</div><div>${respEmail}</div></div></div></div></div></body></html>`
 }
 
 function descargarPDF({ p, cliente }) {
@@ -143,6 +143,7 @@ function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
 function ModalEnvio({ propuesta, cliente, onClose, onEnviado }) {
   const [tab, setTab] = useState('wa')
   const [copied, setCopied] = useState(false)
+
   const total = (propuesta.items || []).reduce((s, it) => s + (parseFloat(it.precio) || 0), 0)
   const respNombre = propuesta.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
   const respEmail = propuesta.responsable === 'pablo' ? 'pablo@onesevenia.com' : 'alberto@onesevenia.com'
@@ -160,47 +161,38 @@ Total: ${formatEur(total)}
 Valida ${propuesta.validez || 30} dias.
 
 Cualquier duda estoy disponible.
-
 ONESEVEN IA - onesevenia.com`
 
   const asuntoEmail = `Propuesta ${ref} - ${propuesta.titulo}`
   const msgEmail =
 `Hola ${cliente?.nombre?.split(' ')[0] || ''},
 
-Adjunto encontraras la propuesta personalizada que hemos preparado para ti desde ONESEVEN IA.
+Adjunto la propuesta "${propuesta.titulo}" (${ref}) de ONESEVEN IA.
 
-${propuesta.titulo}
-Referencia: ${ref} | Fecha: ${formatDate(propuesta.fecha)}
+Servicios:
+${(propuesta.items || []).filter(it => it.descripcion).map(it => `- ${it.descripcion}${it.precio ? ': ' + formatEur(parseFloat(it.precio)) : ''}`).join('\n')}
 
-Servicios incluidos:
-${(propuesta.items || []).filter(it => it.descripcion).map(it => `- ${it.descripcion}${it.detalle ? ' (' + it.detalle + ')' : ''}${it.precio ? ': ' + formatEur(parseFloat(it.precio)) : ''}`).join('\n')}
-
-Total propuesta: ${formatEur(total)}
+Total: ${formatEur(total)}
 Valida ${propuesta.validez || 30} dias.
 
-Para cualquier duda o para aceptar la propuesta, no dudes en contactarme.
-
 Un saludo,
-${respNombre}
-ONESEVEN IA
+${respNombre} - ONESEVEN IA
 ${respEmail}`
 
-  const handleDescargar = () => {
+  const handleVerPDF = () => {
     descargarPDF({ p: propuesta, cliente })
   }
 
   const handleEnviarWA = () => {
-    descargarPDF({ p: propuesta, cliente })
     const phone = cliente?.telefono?.replace(/\D/g, '') || ''
     const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msgWA)}`
-    setTimeout(() => window.open(waUrl, '_blank'), 1500)
+    window.open(waUrl, '_blank')
     onEnviado('wa')
   }
 
   const handleEnviarEmail = () => {
-    descargarPDF({ p: propuesta, cliente })
     const mailUrl = `mailto:${cliente?.email || ''}?subject=${encodeURIComponent(asuntoEmail)}&body=${encodeURIComponent(msgEmail)}`
-    setTimeout(() => { window.location.href = mailUrl }, 1500)
+    window.open(mailUrl, '_blank')
     onEnviado('email')
   }
 
@@ -208,68 +200,110 @@ ${respEmail}`
     navigator.clipboard.writeText(txt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
 
+  const hasWA = !!cliente?.telefono
+  const hasEmail = !!cliente?.email
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 560, border: '1px solid var(--border)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background: 'var(--bg1)', borderRadius: '20px 20px 0 0', border: '1px solid var(--border)', maxHeight: '90vh', overflowY: 'auto' }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border2)' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 12px' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>Enviar propuesta</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{cliente?.nombre} · {ref}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text0)' }}>Enviar propuesta</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)' }}>{ref} · {cliente?.nombre}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 4 }}><CloseIcon /></button>
-        </div>
-
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {[
-            { id: 'wa', label: 'WhatsApp', icon: <WAIcon />, color: '#25d366', disabled: !cliente?.telefono },
-            { id: 'email', label: 'Email', icon: <MailIcon />, color: '#6366f1', disabled: !cliente?.email },
-          ].map(t => (
-            <button key={t.id} onClick={() => !t.disabled && setTab(t.id)} style={{ flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, fontWeight: tab === t.id ? 600 : 400, cursor: t.disabled ? 'not-allowed' : 'pointer', background: 'none', border: 'none', borderBottom: tab === t.id ? `2px solid ${t.color}` : '2px solid transparent', color: t.disabled ? 'var(--text3)' : tab === t.id ? t.color : 'var(--text2)', opacity: t.disabled ? 0.4 : 1, transition: 'all 0.15s' }}>
-              {t.icon}{t.label}{t.disabled && <span style={{ fontSize: 10, color: 'var(--red)' }}>(sin datos)</span>}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ padding: '16px 20px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
-            <DownloadIcon />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text0)' }}>PDF listo para adjuntar</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Se descargara el PDF y luego se abrira {tab === 'wa' ? 'WhatsApp' : 'tu app de email'}</div>
-            </div>
-            <button className="btn btn-ghost btn-sm" onClick={handleDescargar} style={{ gap: 5 }}>
-              <DownloadIcon /> Solo PDF
-            </button>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>Mensaje</label>
-              <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copiarMensaje(tab === 'wa' ? msgWA : msgEmail)}>
-                <CopyIcon /> {copied ? 'Copiado' : 'Copiar'}
-              </button>
-            </div>
-            <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px', fontSize: 11, color: 'var(--text1)', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}>
-              {tab === 'wa' ? msgWA : msgEmail}
-            </div>
-            {tab === 'email' && (
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
-                Asunto: <strong style={{ color: 'var(--text1)' }}>{asuntoEmail}</strong>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={tab === 'wa' ? handleEnviarWA : handleEnviarEmail}
-           
-            style={{ width: '100%', padding: '13px', borderRadius: 'var(--radius)', border: 'none', cursor: descargando ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#fff', background: tab === 'wa' ? '#25d366' : 'var(--accent)' }}
-          >
-            {tab === 'wa' ? <WAIcon /> : <MailIcon />}
-            {tab === 'wa' ? 'Abrir propuesta + WhatsApp' : 'Abrir propuesta + Email'}
+          <button onClick={onClose} style={{ background: 'var(--bg3)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CloseIcon />
           </button>
-          <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>
-            El PDF se descarga en tu dispositivo para que lo adjuntes manualmente al mensaje
-          </div>
+        </div>
+
+        <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Ver propuesta */}
+          <button
+            onClick={handleVerPDF}
+            style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}>
+              <DownloadIcon />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Ver propuesta</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Abre la propuesta · guarda como PDF</div>
+            </div>
+          </button>
+
+          {/* Enviar por WhatsApp */}
+          {hasWA ? (
+            <div style={{ borderRadius: 12, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.05)', overflow: 'hidden' }}>
+              <button
+                onClick={handleEnviarWA}
+                style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(37,211,102,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#25d366', flexShrink: 0 }}>
+                  <WAIcon />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Enviar por WhatsApp</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>{cliente?.telefono}</div>
+                </div>
+                <span style={{ fontSize: 18, color: '#25d366' }}>&#8250;</span>
+              </button>
+              {/* Mensaje preview */}
+              <div style={{ margin: '0 14px 14px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 100, overflowY: 'auto' }}>
+                {msgWA}
+              </div>
+              <div style={{ display: 'flex', gap: 8, padding: '0 14px 12px' }}>
+                <button onClick={() => copiarMensaje(msgWA)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--border2)', background: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <CopyIcon /> {copied ? 'Copiado' : 'Copiar mensaje'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', opacity: 0.5 }}>
+              <div style={{ fontSize: 13, color: 'var(--text3)' }}>WhatsApp no disponible — sin telefono</div>
+            </div>
+          )}
+
+          {/* Enviar por Email */}
+          {hasEmail ? (
+            <div style={{ borderRadius: 12, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)', overflow: 'hidden' }}>
+              <button
+                onClick={handleEnviarEmail}
+                style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}>
+                  <MailIcon />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Enviar por Email</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>{cliente?.email}</div>
+                </div>
+                <span style={{ fontSize: 18, color: 'var(--accent2)' }}>&#8250;</span>
+              </button>
+              <div style={{ margin: '0 14px 14px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 100, overflowY: 'auto' }}>
+                {msgEmail}
+              </div>
+              <div style={{ display: 'flex', gap: 8, padding: '0 14px 12px' }}>
+                <button onClick={() => copiarMensaje(msgEmail)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--border2)', background: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <CopyIcon /> {copied ? 'Copiado' : 'Copiar mensaje'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', opacity: 0.5 }}>
+              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Email no disponible — sin email</div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
