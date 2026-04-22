@@ -191,8 +191,9 @@ ${respEmail}`
   }
 
   const handleEnviarEmail = () => {
-    const mailUrl = `mailto:${cliente?.email || ''}?subject=${encodeURIComponent(asuntoEmail)}&body=${encodeURIComponent(msgEmail)}`
-    window.open(mailUrl, '_blank')
+    // Abre Gmail compose directamente con puado@onesevenia.com
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&from=puado@onesevenia.com&to=${encodeURIComponent(cliente?.email || '')}&su=${encodeURIComponent(asuntoEmail)}&body=${encodeURIComponent(msgEmail)}`
+    window.open(gmailUrl, '_blank')
     onEnviado('email')
   }
 
