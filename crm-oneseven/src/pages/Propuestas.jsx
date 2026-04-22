@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { jsPDF } from 'jspdf'
 import Layout from '../components/Layout'
 import { useClientes } from '../hooks/useData'
 import { usePropuestas } from '../hooks/useData'
@@ -14,10 +15,10 @@ function CloseIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fi
 function CopyIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M1 9V2a1 1 0 0 1 1-1h7"/></svg> }
 
 const SERVICIOS_LISTA = [
-  { label: 'Desarrollo Web', desc: 'Diseño y desarrollo de sitio web profesional' },
-  { label: 'Automatizaciones', desc: 'Automatización de procesos con n8n y Make' },
+  { label: 'Desarrollo Web', desc: 'Diseno y desarrollo de sitio web profesional' },
+  { label: 'Automatizaciones', desc: 'Automatizacion de procesos con n8n y Make' },
   { label: 'Agente IA', desc: 'Agente de inteligencia artificial personalizado' },
-  { label: 'Consultoría IA', desc: 'Asesoramiento estratégico en IA para tu empresa' },
+  { label: 'Consultoria IA', desc: 'Asesoramiento estrategico en IA para tu empresa' },
   { label: 'Retainer Mensual', desc: 'Mantenimiento y soporte mensual continuo' },
   { label: 'SEO / Marketing Digital', desc: 'Posicionamiento y visibilidad online' },
 ]
@@ -25,44 +26,167 @@ const SERVICIOS_LISTA = [
 const ESTADO_COLORS = {
   borrador: { bg: 'var(--bg4)', color: 'var(--text3)', label: 'Borrador' },
   enviada: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', label: 'Enviada' },
-  aceptada: { bg: 'rgba(16,185,129,0.15)', color: 'var(--green)', label: 'Aceptada ✓' },
+  aceptada: { bg: 'rgba(16,185,129,0.15)', color: 'var(--green)', label: 'Aceptada' },
   rechazada: { bg: 'rgba(239,68,68,0.15)', color: 'var(--red)', label: 'Rechazada' },
   caducada: { bg: 'rgba(245,158,11,0.15)', color: 'var(--amber)', label: 'Caducada' },
 }
 
-// ─── Generar HTML de propuesta ────────────────────────────────────────────────
-function generarHTMLPropuesta({ p, cliente }) {
+// ─── Generar PDF real con jsPDF ───────────────────────────────────────────────
+async function generarPDF({ p, cliente }) {
   const respNombre = p.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
   const respEmail = p.responsable === 'pablo' ? 'pablo@onesevenia.com' : 'alberto@onesevenia.com'
-  const items = Array.isArray(p.items) ? p.items : []
+  const items = (Array.isArray(p.items) ? p.items : []).filter(it => it.descripcion)
   const total = items.reduce((s, it) => s + (parseFloat(it.precio) || 0), 0)
   const ref = `OS-${new Date(p.fecha || p.created_at).getFullYear()}-${p.id?.slice(-3).toUpperCase() || '000'}`
 
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Propuesta ${ref}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}.page{max-width:794px;margin:0 auto}.header{background:linear-gradient(135deg,#0a0a1a,#1a1a3e);color:white;padding:48px 56px 40px}.ht{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px}.li img{height:40px;filter:brightness(0)invert(1)}.li .sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:6px;letter-spacing:.08em}.hm{text-align:right;font-size:12px;color:rgba(255,255,255,.5)}.htitle{font-size:26px;font-weight:300;margin-bottom:8px}.hsub{font-size:14px;color:rgba(255,255,255,.6)}.ab{height:4px;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4)}.body{padding:48px 56px}.section{margin-bottom:32px}.st{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#6366f1;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e8e8f0}.ig{display:grid;grid-template-columns:1fr 1fr;gap:20px}.ib{background:#f8f8ff;border-radius:8px;padding:18px;border-left:3px solid #6366f1}.ib .lb{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:6px}.ib .vl{font-size:15px;font-weight:600;color:#1a1a2e}.ib .sb{font-size:12px;color:#666;margin-top:3px}.intro{font-size:14px;color:#444;line-height:1.8;background:#fafafa;padding:22px;border-radius:8px;border:1px solid #eee}table{width:100%;border-collapse:separate;border-spacing:0}th{background:#1a1a2e;color:white;padding:12px 16px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}th:first-child{border-radius:8px 0 0 0}th:last-child{border-radius:0 8px 0 0;text-align:right}td{padding:14px 16px;border-bottom:1px solid #f0f0f8;vertical-align:top}tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#fafaff}.in{font-weight:600;color:#1a1a2e;margin-bottom:3px}.id{font-size:12px;color:#666}.ip{text-align:right;font-weight:700;color:#1a1a2e;font-size:15px;white-space:nowrap}.tr{background:linear-gradient(135deg,#6366f1,#8b5cf6)}.tr td{padding:16px;font-weight:700;font-size:16px;border:none!important;color:white}.vb{display:inline-flex;align-items:center;gap:8px;background:#fff8e7;border:1px solid #fbbf24;border-radius:20px;padding:6px 14px;font-size:12px;color:#92400e;margin-top:12px}.cond{font-size:13px;color:#555;line-height:1.8;white-space:pre-line}.footer{background:#0a0a1a;color:rgba(255,255,255,.5);padding:24px 56px;display:flex;justify-content:space-between;align-items:center;font-size:12px}</style></head><body><div class="page"><div class="header"><div class="ht"><div class="li"><img src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png" alt="ONESEVEN IA" onerror="this.style.display='none'"><div class="sub">AUTOMATIZACIÓN E INTELIGENCIA ARTIFICIAL</div></div><div class="hm"><div>${ref}</div><div>${formatDate(p.fecha)}</div></div></div><div class="htitle">${p.titulo}</div><div class="hsub">Para ${cliente?.nombre || ''}${cliente?.empresa ? ' · ' + cliente.empresa : ''}</div></div><div class="ab"></div><div class="body"><div class="section"><div class="st">Información</div><div class="ig"><div class="ib"><div class="lb">Destinatario</div><div class="vl">${cliente?.nombre || '—'}</div><div class="sb">${cliente?.empresa || ''}</div>${cliente?.email ? '<div class="sb">' + cliente.email + '</div>' : ''}</div><div class="ib"><div class="lb">Preparada por</div><div class="vl">${respNombre}</div><div class="sb">ONESEVEN IA</div><div class="sb">${respEmail}</div></div></div></div>${p.intro ? '<div class="section"><div class="st">Presentación</div><div class="intro">' + p.intro + '</div></div>' : ''}<div class="section"><div class="st">Servicios incluidos</div><table><thead><tr><th style="width:70%">Servicio</th><th>Importe</th></tr></thead><tbody>${items.filter(it => it.descripcion).map(it => '<tr><td><div class="in">' + it.descripcion + '</div>' + (it.detalle ? '<div class="id">' + it.detalle + '</div>' : '') + '</td><td class="ip">' + (it.precio ? formatEur(parseFloat(it.precio)) : '—') + '</td></tr>').join('')}<tr class="tr"><td>Total propuesta</td><td style="text-align:right;font-size:20px">${formatEur(total)}</td></tr></tbody></table>${p.validez ? '<div class="vb">⏳ Válida ' + p.validez + ' días desde la fecha de emisión</div>' : ''}</div>${p.condiciones ? '<div class="section"><div class="st">Condiciones</div><div class="cond">' + p.condiciones + '</div></div>' : ''}</div><div class="footer"><div><div style="color:white;font-weight:600;margin-bottom:4px">ONESEVEN IA</div><div>onesevenia.com</div></div><div style="text-align:right"><div style="color:white;font-weight:600;margin-bottom:4px">${respNombre}</div><div>${respEmail}</div></div></div></div></body></html>`
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const W = 210, H = 297
+  let y = 0
+
+  // Header oscuro
+  doc.setFillColor(10, 10, 26)
+  doc.rect(0, 0, W, 60, 'F')
+
+  // Barra gradiente (simulada con 3 rectángulos)
+  doc.setFillColor(99, 102, 241); doc.rect(0, 60, 70, 2, 'F')
+  doc.setFillColor(168, 85, 247); doc.rect(70, 60, 70, 2, 'F')
+  doc.setFillColor(6, 182, 212); doc.rect(140, 60, 70, 2, 'F')
+
+  // Referencia y fecha (header)
+  doc.setTextColor(150, 150, 180)
+  doc.setFontSize(8)
+  doc.text(ref, W - 15, 18, { align: 'right' })
+  doc.text(formatDate(p.fecha), W - 15, 24, { align: 'right' })
+
+  // Titulo propuesta
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'normal')
+  doc.text(p.titulo || 'Propuesta de servicios', 15, 38)
+
+  // Cliente
+  doc.setFontSize(10)
+  doc.setTextColor(180, 180, 210)
+  doc.text(`Para ${cliente?.nombre || ''}${cliente?.empresa ? ' · ' + cliente.empresa : ''}`, 15, 48)
+
+  y = 75
+
+  // Seccion Informacion
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(99, 102, 241)
+  doc.text('INFORMACION', 15, y)
+  doc.setDrawColor(99, 102, 241)
+  doc.line(15, y + 2, W - 15, y + 2)
+  y += 8
+
+  // Cajas info
+  doc.setFillColor(248, 248, 255)
+  doc.roundedRect(15, y, 85, 28, 2, 2, 'F')
+  doc.roundedRect(110, y, 85, 28, 2, 2, 'F')
+
+  doc.setFontSize(7); doc.setTextColor(130, 130, 160); doc.setFont('helvetica', 'bold')
+  doc.text('DESTINATARIO', 20, y + 7)
+  doc.text('PREPARADA POR', 115, y + 7)
+  doc.setFontSize(10); doc.setTextColor(26, 26, 46); doc.setFont('helvetica', 'bold')
+  doc.text(cliente?.nombre || '-', 20, y + 14)
+  doc.text(respNombre, 115, y + 14)
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 130)
+  if (cliente?.empresa) doc.text(cliente.empresa, 20, y + 20)
+  if (cliente?.email) doc.text(cliente.email, 20, y + 25)
+  doc.text('ONESEVEN IA', 115, y + 20)
+  doc.text(respEmail, 115, y + 25)
+  y += 36
+
+  // Intro
+  if (p.intro) {
+    doc.setFillColor(250, 250, 252)
+    doc.setDrawColor(220, 220, 235)
+    doc.roundedRect(15, y, W - 30, 18, 2, 2, 'FD')
+    doc.setFontSize(9); doc.setTextColor(80, 80, 100); doc.setFont('helvetica', 'normal')
+    const introLines = doc.splitTextToSize(p.intro, W - 42)
+    doc.text(introLines.slice(0, 2), 20, y + 7)
+    y += 26
+  }
+
+  // Seccion Servicios
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(99, 102, 241)
+  doc.text('SERVICIOS INCLUIDOS', 15, y)
+  doc.setDrawColor(99, 102, 241); doc.line(15, y + 2, W - 15, y + 2)
+  y += 8
+
+  // Cabecera tabla
+  doc.setFillColor(26, 26, 46)
+  doc.roundedRect(15, y, W - 30, 8, 1, 1, 'F')
+  doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold')
+  doc.text('SERVICIO', 20, y + 5.5)
+  doc.text('IMPORTE', W - 20, y + 5.5, { align: 'right' })
+  y += 9
+
+  // Filas items
+  items.forEach((it, i) => {
+    if (i % 2 === 0) { doc.setFillColor(250, 250, 255); doc.rect(15, y, W - 30, 12, 'F') }
+    doc.setFontSize(9); doc.setTextColor(26, 26, 46); doc.setFont('helvetica', 'bold')
+    doc.text(it.descripcion, 20, y + 5)
+    if (it.detalle) { doc.setFontSize(7); doc.setTextColor(100, 100, 130); doc.setFont('helvetica', 'normal'); doc.text(it.detalle, 20, y + 9.5) }
+    doc.setFontSize(10); doc.setTextColor(26, 26, 46); doc.setFont('helvetica', 'bold')
+    doc.text(it.precio ? formatEur(parseFloat(it.precio)) : '-', W - 20, y + 6, { align: 'right' })
+    y += 13
+  })
+
+  // Fila total
+  doc.setFillColor(99, 102, 241)
+  doc.roundedRect(15, y, W - 30, 12, 1, 1, 'F')
+  doc.setFontSize(10); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold')
+  doc.text('Total propuesta', 20, y + 8)
+  doc.setFontSize(14)
+  doc.text(formatEur(total), W - 20, y + 8.5, { align: 'right' })
+  y += 16
+
+  if (p.validez) {
+    doc.setFontSize(8); doc.setTextColor(130, 90, 10); doc.setFont('helvetica', 'normal')
+    doc.text(`Valida ${p.validez} dias desde la fecha de emision`, 15, y + 4)
+    y += 10
+  }
+
+  // Condiciones
+  if (p.condiciones) {
+    y += 4
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(99, 102, 241)
+    doc.text('CONDICIONES', 15, y)
+    doc.setDrawColor(99, 102, 241); doc.line(15, y + 2, W - 15, y + 2)
+    y += 8
+    doc.setFontSize(8); doc.setTextColor(80, 80, 100); doc.setFont('helvetica', 'normal')
+    const condLines = doc.splitTextToSize(p.condiciones, W - 30)
+    doc.text(condLines, 15, y)
+    y += condLines.length * 4.5
+  }
+
+  // Footer
+  doc.setFillColor(10, 10, 26)
+  doc.rect(0, H - 20, W, 20, 'F')
+  doc.setFontSize(8); doc.setTextColor(150, 150, 180); doc.setFont('helvetica', 'normal')
+  doc.text('ONESEVEN IA · onesevenia.com', 15, H - 10)
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(200, 200, 220)
+  doc.text(respNombre + ' · ' + respEmail, W - 15, H - 10, { align: 'right' })
+
+  return { doc, ref, nombre: cliente?.nombre || 'cliente' }
 }
 
-// ─── Descargar PDF directamente (sin imprimir) ────────────────────────────────
-function descargarPDF({ p, cliente }) {
-  const html = generarHTMLPropuesta({ p, cliente })
-  const ref = `OS-${new Date(p.fecha || p.created_at).getFullYear()}-${p.id?.slice(-3).toUpperCase() || '000'}`
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `Propuesta-${ref}-${cliente?.nombre || 'cliente'}.html`
-  a.click()
-  URL.revokeObjectURL(url)
+async function descargarPDF({ p, cliente }) {
+  const { doc, ref, nombre } = await generarPDF({ p, cliente })
+  doc.save(`Propuesta-${ref}-${nombre}.pdf`)
 }
 
 // ─── Formulario ───────────────────────────────────────────────────────────────
 function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
   const isEdit = !!propuesta?.id
   const [form, setForm] = useState({
-    cliente_id: '', titulo: 'Propuesta de servicios de automatización e IA',
+    cliente_id: '', titulo: 'Propuesta de servicios de automatizacion e IA',
     fecha: new Date().toISOString().split('T')[0], validez: '30',
     intro: 'Nos complace presentarte esta propuesta personalizada para ayudarte a optimizar tus procesos y potenciar tu negocio con inteligencia artificial.',
     items: [{ descripcion: '', detalle: '', precio: '' }],
-    condiciones: 'El 50% del importe se abona antes de iniciar el proyecto. El 50% restante al finalizar la entrega.\n\nEl plazo de ejecución se acuerda una vez confirmada la propuesta.\n\nLos precios indicados no incluyen IVA.',
+    condiciones: 'El 50% del importe se abona antes de iniciar el proyecto. El 50% restante al finalizar la entrega.\n\nEl plazo de ejecucion se acuerda una vez confirmada la propuesta.\n\nLos precios indicados no incluyen IVA.',
     responsable: 'pablo', estado: 'borrador',
     ...propuesta,
     items: propuesta?.items?.length ? propuesta.items : [{ descripcion: '', detalle: '', precio: '' }],
@@ -88,17 +212,17 @@ function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label">Título</label>
+          <label className="form-label">Titulo</label>
           <input className="form-input" value={form.titulo} onChange={e => set('titulo', e.target.value)} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0 12px' }}>
           <div className="form-group"><label className="form-label">Fecha</label><input className="form-input" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} /></div>
-          <div className="form-group"><label className="form-label">Validez (días)</label><input className="form-input" type="number" value={form.validez} onChange={e => set('validez', e.target.value)} /></div>
+          <div className="form-group"><label className="form-label">Validez (dias)</label><input className="form-input" type="number" value={form.validez} onChange={e => set('validez', e.target.value)} /></div>
           <div className="form-group"><label className="form-label">Responsable</label><select className="form-select" value={form.responsable} onChange={e => set('responsable', e.target.value)}><option value="pablo">Pablo Puado</option><option value="alberto">Alberto</option></select></div>
           <div className="form-group"><label className="form-label">Estado</label><select className="form-select" value={form.estado} onChange={e => set('estado', e.target.value)}>{Object.entries(ESTADO_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Presentación</label>
+          <label className="form-label">Presentacion</label>
           <textarea className="form-textarea" value={form.intro} onChange={e => set('intro', e.target.value)} style={{ minHeight: 70 }} />
         </div>
       </div>
@@ -106,7 +230,7 @@ function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Servicios y precios</div>
-          <button className="btn btn-ghost btn-sm" onClick={addItem}>+ Añadir</button>
+          <button className="btn btn-ghost btn-sm" onClick={addItem}>+ Anadir</button>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
           {SERVICIOS_LISTA.map(s => (
@@ -122,7 +246,7 @@ function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 32px', gap: '0 8px', marginBottom: 7, alignItems: 'start' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>{i === 0 && <label className="form-label">Servicio</label>}<input className="form-input" value={item.descripcion} onChange={e => updateItem(i, 'descripcion', e.target.value)} placeholder="Nombre" /></div>
             <div className="form-group" style={{ marginBottom: 0 }}>{i === 0 && <label className="form-label">Detalle</label>}<input className="form-input" value={item.detalle} onChange={e => updateItem(i, 'detalle', e.target.value)} placeholder="Opcional" /></div>
-            <div className="form-group" style={{ marginBottom: 0 }}>{i === 0 && <label className="form-label">Precio (€)</label>}<input className="form-input" type="number" value={item.precio} onChange={e => updateItem(i, 'precio', e.target.value)} placeholder="0" /></div>
+            <div className="form-group" style={{ marginBottom: 0 }}>{i === 0 && <label className="form-label">Precio (EUR)</label>}<input className="form-input" type="number" value={item.precio} onChange={e => updateItem(i, 'precio', e.target.value)} placeholder="0" /></div>
             <div style={{ paddingTop: i === 0 ? 22 : 0 }}><button className="btn-icon" style={{ width: 32, height: 36, color: 'var(--red)' }} onClick={() => form.items.length > 1 && removeItem(i)}><TrashIcon /></button></div>
           </div>
         ))}
@@ -147,71 +271,77 @@ function FormularioPropuesta({ propuesta, clientes, onSave, onCancel }) {
   )
 }
 
-// ─── Modal envío ──────────────────────────────────────────────────────────────
+// ─── Modal envio ──────────────────────────────────────────────────────────────
 function ModalEnvio({ propuesta, cliente, onClose, onEnviado }) {
   const [tab, setTab] = useState('wa')
   const [copied, setCopied] = useState(false)
+  const [descargando, setDescargando] = useState(false)
+
   const total = (propuesta.items || []).reduce((s, it) => s + (parseFloat(it.precio) || 0), 0)
   const respNombre = propuesta.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
   const respEmail = propuesta.responsable === 'pablo' ? 'pablo@onesevenia.com' : 'alberto@onesevenia.com'
   const ref = `OS-${new Date(propuesta.fecha || propuesta.created_at).getFullYear()}-${propuesta.id?.slice(-3).toUpperCase() || '000'}`
 
-  const msgWA = `Hola ${cliente?.nombre?.split(' ')[0] || ''}! 👋
+  const msgWA =
+`Hola ${cliente?.nombre?.split(' ')[0] || ''}!
 
-Te adjunto la propuesta *${propuesta.titulo}* (${ref}) que hemos preparado para ti desde ONESEVEN IA.
+Te adjunto la propuesta "${propuesta.titulo}" (${ref}) que hemos preparado para ti desde ONESEVEN IA.
 
-📋 *Resumen:*
-${(propuesta.items || []).filter(it => it.descripcion).map(it => `• ${it.descripcion}${it.precio ? ' — ' + formatEur(parseFloat(it.precio)) : ''}`).join('\n')}
+Resumen:
+${(propuesta.items || []).filter(it => it.descripcion).map(it => `- ${it.descripcion}${it.precio ? ': ' + formatEur(parseFloat(it.precio)) : ''}`).join('\n')}
 
-💰 *Total: ${formatEur(total)}*
-📅 Válida ${propuesta.validez || 30} días
+Total: ${formatEur(total)}
+Valida ${propuesta.validez || 30} dias.
 
-Cualquier duda estoy disponible! 🚀
+Cualquier duda estoy disponible.
 
-_ONESEVEN IA · onesevenia.com_`
+ONESEVEN IA - onesevenia.com`
 
-  const asuntoEmail = `Propuesta ${ref} — ${propuesta.titulo}`
-  const msgEmail = `Hola ${cliente?.nombre?.split(' ')[0] || ''},
+  const asuntoEmail = `Propuesta ${ref} - ${propuesta.titulo}`
+  const msgEmail =
+`Hola ${cliente?.nombre?.split(' ')[0] || ''},
 
-Adjunto encontrarás la propuesta personalizada que hemos preparado para ti desde ONESEVEN IA.
+Adjunto encontraras la propuesta personalizada que hemos preparado para ti desde ONESEVEN IA.
 
-${propuesta.titulo} | Ref: ${ref} | Fecha: ${formatDate(propuesta.fecha)}
+${propuesta.titulo}
+Referencia: ${ref} | Fecha: ${formatDate(propuesta.fecha)}
 
-SERVICIOS:
-${(propuesta.items || []).filter(it => it.descripcion).map(it => `• ${it.descripcion}${it.detalle ? ' — ' + it.detalle : ''}${it.precio ? ' (' + formatEur(parseFloat(it.precio)) + ')' : ''}`).join('\n')}
+Servicios incluidos:
+${(propuesta.items || []).filter(it => it.descripcion).map(it => `- ${it.descripcion}${it.detalle ? ' (' + it.detalle + ')' : ''}${it.precio ? ': ' + formatEur(parseFloat(it.precio)) : ''}`).join('\n')}
 
-TOTAL: ${formatEur(total)}
-Válida ${propuesta.validez || 30} días.
+Total propuesta: ${formatEur(total)}
+Valida ${propuesta.validez || 30} dias.
+
+Para cualquier duda o para aceptar la propuesta, no dudes en contactarme.
 
 Un saludo,
 ${respNombre}
-ONESEVEN IA · ${respEmail}`
+ONESEVEN IA
+${respEmail}`
 
-  const handleDescargar = () => descargarPDF({ p: propuesta, cliente })
-
-  const handleEnviarWA = () => {
-    // 1. Descargar PDF
-    descargarPDF({ p: propuesta, cliente })
-    // 2. Copiar mensaje al portapapeles
-    navigator.clipboard.writeText(msgWA).catch(() => {})
-    // 3. Abrir WhatsApp
-    const phone = cliente?.telefono?.replace(/\D/g, '') || ''
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msgWA)}`
-    setTimeout(() => {
-      window.open(waUrl, '_blank')
-      onEnviado('wa')
-    }, 800)
+  const handleDescargar = async () => {
+    setDescargando(true)
+    await descargarPDF({ p: propuesta, cliente })
+    setDescargando(false)
   }
 
-  const handleEnviarEmail = () => {
-    // 1. Descargar PDF
-    descargarPDF({ p: propuesta, cliente })
-    // 2. Abrir cliente de correo con el mensaje
+  const handleEnviarWA = async () => {
+    setDescargando(true)
+    await descargarPDF({ p: propuesta, cliente })
+    setDescargando(false)
+    const phone = cliente?.telefono?.replace(/\D/g, '') || ''
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msgWA)}`
+    window.open(waUrl, '_blank')
+    onEnviado('wa')
+  }
+
+  const handleEnviarEmail = async () => {
+    setDescargando(true)
+    await descargarPDF({ p: propuesta, cliente })
+    setDescargando(false)
     const mailUrl = `mailto:${cliente?.email || ''}?subject=${encodeURIComponent(asuntoEmail)}&body=${encodeURIComponent(msgEmail)}`
-    setTimeout(() => {
-      window.location.href = mailUrl
-      onEnviado('email')
-    }, 800)
+    window.location.href = mailUrl
+    onEnviado('email')
   }
 
   const copiarMensaje = (txt) => {
@@ -221,7 +351,6 @@ ONESEVEN IA · ${respEmail}`
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 560, border: '1px solid var(--border)', overflow: 'hidden' }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>Enviar propuesta</div>
@@ -230,7 +359,6 @@ ONESEVEN IA · ${respEmail}`
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 4 }}><CloseIcon /></button>
         </div>
 
-        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
           {[
             { id: 'wa', label: 'WhatsApp', icon: <WAIcon />, color: '#25d366', disabled: !cliente?.telefono },
@@ -243,24 +371,22 @@ ONESEVEN IA · ${respEmail}`
         </div>
 
         <div style={{ padding: '16px 20px 20px' }}>
-          {/* Info descarga */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
             <DownloadIcon />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text0)' }}>La propuesta se descargará como archivo</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Se guardará en tu dispositivo lista para adjuntar</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text0)' }}>PDF listo para adjuntar</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Se descargara el PDF y luego se abrira {tab === 'wa' ? 'WhatsApp' : 'tu app de email'}</div>
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={handleDescargar} style={{ gap: 5 }}>
-              <DownloadIcon /> Descargar
+            <button className="btn btn-ghost btn-sm" onClick={handleDescargar} disabled={descargando} style={{ gap: 5 }}>
+              <DownloadIcon /> {descargando ? 'Generando...' : 'Solo PDF'}
             </button>
           </div>
 
-          {/* Mensaje */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>Mensaje predeterminado</label>
+              <label className="form-label" style={{ marginBottom: 0 }}>Mensaje</label>
               <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copiarMensaje(tab === 'wa' ? msgWA : msgEmail)}>
-                <CopyIcon /> {copied ? '✓ Copiado' : 'Copiar'}
+                <CopyIcon /> {copied ? 'Copiado' : 'Copiar'}
               </button>
             </div>
             <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px', fontSize: 11, color: 'var(--text1)', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}>
@@ -273,20 +399,16 @@ ONESEVEN IA · ${respEmail}`
             )}
           </div>
 
-          {/* Botón envío */}
           <button
             onClick={tab === 'wa' ? handleEnviarWA : handleEnviarEmail}
-            style={{ width: '100%', padding: '13px', borderRadius: 'var(--radius)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#fff', background: tab === 'wa' ? '#25d366' : 'var(--accent)' }}
+            disabled={descargando}
+            style={{ width: '100%', padding: '13px', borderRadius: 'var(--radius)', border: 'none', cursor: descargando ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#fff', background: tab === 'wa' ? '#25d366' : 'var(--accent)', opacity: descargando ? 0.7 : 1 }}
           >
             {tab === 'wa' ? <WAIcon /> : <MailIcon />}
-            {tab === 'wa'
-              ? `Descargar PDF + Abrir WhatsApp`
-              : `Descargar PDF + Abrir Email`}
+            {descargando ? 'Generando PDF...' : tab === 'wa' ? 'Descargar PDF + Abrir WhatsApp' : 'Descargar PDF + Abrir Email'}
           </button>
           <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>
-            {tab === 'wa'
-              ? 'Se descargará el PDF y se abrirá WhatsApp con el mensaje listo para enviar'
-              : 'Se descargará el PDF y se abrirá tu app de email con el mensaje listo'}
+            El PDF se descarga en tu dispositivo para que lo adjuntes manualmente al mensaje
           </div>
         </div>
       </div>
@@ -294,7 +416,7 @@ ONESEVEN IA · ${respEmail}`
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// ─── Pagina principal ─────────────────────────────────────────────────────────
 export default function Propuestas() {
   const { clientes } = useClientes()
   const { propuestas, crear, actualizar, eliminar } = usePropuestas()
@@ -347,7 +469,6 @@ export default function Propuestas() {
       subtitle={`${propuestasFiltradas.length} propuesta${propuestasFiltradas.length !== 1 ? 's' : ''}`}
       actions={<button className="btn btn-primary" onClick={() => { setEditando(null); setVista('form') }}><PlusIcon /> Nueva propuesta</button>}
     >
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
         {[
           { label: 'Total', value: propuestas.length, color: 'var(--text0)' },
@@ -363,9 +484,8 @@ export default function Propuestas() {
         ))}
       </div>
 
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <input className="form-input" style={{ maxWidth: 280 }} placeholder="Buscar por título o cliente..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        <input className="form-input" style={{ maxWidth: 280 }} placeholder="Buscar por titulo o cliente..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         <select className="form-select" style={{ width: 160 }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
           <option value="">Todos los estados</option>
           {Object.entries(ESTADO_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -393,14 +513,14 @@ export default function Propuestas() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>{p.titulo}</span>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: estado.bg, color: estado.color, fontWeight: 500 }}>{estado.label}</span>
-                    {p.enviado_wa && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'rgba(37,211,102,0.15)', color: '#25d366' }}>WA ✓</span>}
-                    {p.enviado_email && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', color: 'var(--accent2)' }}>Email ✓</span>}
+                    {p.enviado_wa && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'rgba(37,211,102,0.15)', color: '#25d366' }}>WA</span>}
+                    {p.enviado_email && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', color: 'var(--accent2)' }}>Email</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
                     <span>{cliente?.nombre}{cliente?.empresa ? ` · ${cliente.empresa}` : ''}</span>
                     <span>{ref}</span>
                     <span>{formatDate(p.fecha)}</span>
-                    {p.validez && <span>Válida {p.validez} días</span>}
+                    {p.validez && <span>Valida {p.validez} dias</span>}
                   </div>
                   {p.items?.filter(it => it.descripcion).length > 0 && (
                     <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
@@ -411,46 +531,21 @@ export default function Propuestas() {
                   )}
                 </div>
 
-                {/* Acciones */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   {total > 0 && <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--green)', marginRight: 4 }}>{formatEur(total)}</span>}
-
-                  {/* WA */}
                   {cliente?.telefono && (
-                    <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviando(p)} title="Enviar por WhatsApp">
-                      <WAIcon />
-                    </button>
+                    <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviando(p)} title="WhatsApp"><WAIcon /></button>
                   )}
-
-                  {/* Email */}
                   {cliente?.email && (
-                    <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent2)', borderRadius: 8, border: '1px solid var(--accent-dim)', background: 'var(--accent-dim)' }} onClick={() => setEnviando(p)} title="Enviar por email">
-                      <MailIcon />
-                    </button>
+                    <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent2)', borderRadius: 8, border: '1px solid var(--accent-dim)', background: 'var(--accent-dim)' }} onClick={() => setEnviando(p)} title="Email"><MailIcon /></button>
                   )}
-
-                  {/* Descargar PDF */}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => descargarPDF({ p, cliente })} title="Descargar PDF">
-                    <DownloadIcon />
-                  </button>
-
-                  {/* Editar */}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { setEditando(p); setVista('form') }} title="Editar">
-                    <EditIcon />
-                  </button>
-
-                  {/* Duplicar */}
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => descargarPDF({ p, cliente })} title="Descargar PDF"><DownloadIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { setEditando(p); setVista('form') }} title="Editar"><EditIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => {
                     const { id, created_at, enviado_wa, enviado_email, fecha_envio, ...datos } = p
                     await crear({ ...datos, titulo: p.titulo + ' (copia)', estado: 'borrador', fecha: new Date().toISOString().split('T')[0] })
-                  }} title="Duplicar">
-                    <CopyIcon />
-                  </button>
-
-                  {/* Eliminar */}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--red)' }} onClick={() => setConfirmDelete(p)} title="Eliminar">
-                    <TrashIcon />
-                  </button>
+                  }} title="Duplicar"><CopyIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--red)' }} onClick={() => setConfirmDelete(p)} title="Eliminar"><TrashIcon /></button>
                 </div>
               </div>
             </div>
@@ -458,7 +553,6 @@ export default function Propuestas() {
         })}
       </div>
 
-      {/* Modal envío */}
       {enviando && (
         <ModalEnvio
           propuesta={enviando}
@@ -468,14 +562,13 @@ export default function Propuestas() {
         />
       )}
 
-      {/* Confirm delete */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && setConfirmDelete(null)}>
           <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', padding: '28px 28px 24px', maxWidth: 380, width: '100%', border: '1px solid var(--border)', textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>!</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text0)', marginBottom: 8 }}>Eliminar propuesta</div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24, lineHeight: 1.6 }}>
-              ¿Eliminar "<strong style={{ color: 'var(--text1)' }}>{confirmDelete.titulo}</strong>"? Esta acción no se puede deshacer.
+            <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>
+              Eliminar "<strong style={{ color: 'var(--text1)' }}>{confirmDelete.titulo}</strong>"? Esta accion no se puede deshacer.
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>Cancelar</button>
