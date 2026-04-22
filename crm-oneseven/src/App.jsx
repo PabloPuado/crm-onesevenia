@@ -42,6 +42,8 @@ function AppRoutes() {
       <Route path="/metricas" element={<ProtectedRoute><Metricas /></ProtectedRoute>} />
       <Route path="/busqueda" element={<ProtectedRoute><BusquedaGlobal /></ProtectedRoute>} />
       <Route path="/propuestas" element={<ProtectedRoute><Propuestas /></ProtectedRoute>} />
+      <Route path="/presupuestos" element={<ProtectedRoute><Presupuestos /></ProtectedRoute>} />
+      <Route path="/gastos" element={<ProtectedRoute><Gastos /></ProtectedRoute>} />
       <Route path="/ingresos" element={<ProtectedRoute><Ingresos /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
       <Route path="/contabilidad" element={<ProtectedRoute><Contabilidad /></ProtectedRoute>} />
