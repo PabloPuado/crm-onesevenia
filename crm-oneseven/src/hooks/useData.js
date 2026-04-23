@@ -247,3 +247,27 @@ export function useGastos() {
   const eliminar = async (id) => { const { error } = await supabase.from('gastos').delete().eq('id', id); if (!error) setGastos(prev => prev.filter(g => g.id !== id)); return { error } }
   return { gastos, loading, fetch, crear, actualizar, eliminar }
 }
+
+export function useEmpresaConfig() {
+  const [config, setConfig] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('empresa_config').select('*').limit(1).single()
+    setConfig(data || {})
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+  const guardar = async (updates) => {
+    if (config?.id) {
+      const { data, error } = await supabase.from('empresa_config').update(updates).eq('id', config.id).select().single()
+      if (!error) setConfig(data)
+      return { data, error }
+    } else {
+      const { data, error } = await supabase.from('empresa_config').insert([updates]).select().single()
+      if (!error) setConfig(data)
+      return { data, error }
+    }
+  }
+  return { config, loading, guardar }
+}
