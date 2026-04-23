@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useClientes } from '../hooks/useData'
-import { usePresupuestos } from '../hooks/useData'
+import { useClientes, usePresupuestos, useEmpresaConfig } from '../hooks/useData'
 import { formatEur, formatDate } from '../lib/constants'
 
 function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg> }
@@ -12,6 +11,7 @@ function WAIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill=
 function MailIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 3l6 5 6-5"/><rect x="1" y="2" width="12" height="10" rx="1"/></svg> }
 function CloseIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg> }
 function CopyIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M1 9V2a1 1 0 0 1 1-1h7"/></svg> }
+function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="2"/><path d="M7 1v2M7 11v2M1 7h2M11 7h2"/></svg> }
 
 const ESTADO_COLORS = {
   borrador: { bg: 'var(--bg4)', color: 'var(--text3)', label: 'Borrador' },
@@ -31,23 +31,202 @@ function calcTotales({ items, descuento, iva }) {
   return { subtotal, desc, base, ivaAmt, total }
 }
 
-function generarHTMLPresupuesto({ p, cliente }) {
+// ─── HTML Presupuesto con datos empresa y cliente ─────────────────────────────
+function generarHTMLPresupuesto({ p, cliente, empresa }) {
+  const emp = empresa || {}
   const respNombre = p.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
-  const respEmail = p.responsable === 'pablo' ? 'pablo@onesevenia.com' : 'alberto@onesevenia.com'
+  const respEmail = p.responsable === 'pablo' ? (emp.email || 'pablo@onesevenia.com') : 'alberto@onesevenia.com'
   const items = (Array.isArray(p.items) ? p.items : []).filter(it => it.descripcion)
   const { subtotal, desc, base, ivaAmt, total } = calcTotales({ items, descuento: p.descuento, iva: p.iva })
   const ref = `PRES-${new Date(p.fecha || p.created_at).getFullYear()}-${p.id?.slice(-3).toUpperCase() || '000'}`
+  const empDireccion = [emp.direccion, emp.cp, emp.ciudad].filter(Boolean).join(', ')
 
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${ref}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}.topbar{position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:8px}.back-btn{background:rgba(255,255,255,.1);color:white;border:none;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer}.save-btn{background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}.topbar-title{color:rgba(255,255,255,.7);font-size:12px;flex:1;text-align:center}.wrapper{padding-top:52px}.page{max-width:794px;margin:0 auto}.header{background:linear-gradient(135deg,#0a0a1a,#1a1a3e);color:white;padding:40px 56px 32px}.ht{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}.li img{height:36px;filter:brightness(0)invert(1)}.hm{text-align:right;font-size:12px;color:rgba(255,255,255,.5)}.ref-badge{display:inline-block;background:rgba(99,102,241,.3);color:#a5b4fc;padding:3px 10px;border-radius:20px;font-size:11px;margin-bottom:6px}.htitle{font-size:22px;font-weight:300;margin-bottom:4px}.hsub{font-size:13px;color:rgba(255,255,255,.6)}.ab{height:4px;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4)}.body{padding:36px 56px}.section{margin-bottom:24px}.st{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#6366f1;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #e8e8f0}.ig{display:grid;grid-template-columns:1fr 1fr;gap:14px}.ib{background:#f8f8ff;border-radius:8px;padding:14px;border-left:3px solid #6366f1}.ib .lb{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:3px}.ib .vl{font-size:13px;font-weight:600;color:#1a1a2e}.ib .sb{font-size:11px;color:#666;margin-top:2px}table{width:100%;border-collapse:separate;border-spacing:0}th{background:#1a1a2e;color:white;padding:9px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0;text-align:right}td{padding:10px 12px;border-bottom:1px solid #f0f0f8;vertical-align:top;font-size:13px}tr:nth-child(even) td{background:#fafaff}.in{font-weight:600;color:#1a1a2e}.id{font-size:11px;color:#888}.ip{text-align:right;font-weight:600;color:#1a1a2e}.totals{margin-top:8px;margin-left:auto;width:280px}.tr-row{display:flex;justify-content:space-between;padding:6px 12px;font-size:13px}.tr-row.sub{color:#555}.tr-row.desc{color:#ef4444}.tr-row.iva{color:#555}.tr-row.total{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-radius:8px;padding:12px;font-weight:700;font-size:15px;margin-top:4px}.cond{font-size:12px;color:#555;line-height:1.8;white-space:pre-line;background:#fafafa;padding:14px;border-radius:6px;border:1px solid #eee}.footer{background:#0a0a1a;color:rgba(255,255,255,.5);padding:18px 56px;display:flex;justify-content:space-between;align-items:center;font-size:11px}@media print{.topbar{display:none}.wrapper{padding-top:0}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}@page{margin:0;size:A4}}</style></head><body><div class="topbar"><button class="back-btn" onclick="window.close()">&#8592; Cerrar</button><span class="topbar-title">${ref}</span><button class="save-btn" onclick="window.print()">Guardar PDF</button></div><div class="wrapper"><div class="page"><div class="header"><div class="ht"><div class="li"><img src="https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png" alt="ONESEVEN IA" onerror="this.style.display='none'"></div><div class="hm"><div class="ref-badge">${ref}</div><div style="margin-top:4px">${formatDate(p.fecha)}</div>${p.validez ? '<div style="margin-top:2px">Valido ' + p.validez + ' dias</div>' : ''}</div></div><div class="htitle">${p.titulo}</div><div class="hsub">Para ${cliente?.nombre || ''}${cliente?.empresa ? ' · ' + cliente.empresa : ''}</div></div><div class="ab"></div><div class="body"><div class="section"><div class="st">Datos del presupuesto</div><div class="ig"><div class="ib"><div class="lb">Cliente</div><div class="vl">${cliente?.nombre || '-'}</div>${cliente?.empresa ? '<div class="sb">' + cliente.empresa + '</div>' : ''}${cliente?.email ? '<div class="sb">' + cliente.email + '</div>' : ''}</div><div class="ib"><div class="lb">Elaborado por</div><div class="vl">${respNombre}</div><div class="sb">ONESEVEN IA</div><div class="sb">${respEmail}</div></div></div></div>${p.intro ? '<div class="section"><p style="font-size:13px;color:#555;line-height:1.8;background:#fafafa;padding:14px;border-radius:6px;border:1px solid #eee">' + p.intro + '</p></div>' : ''}<div class="section"><div class="st">Detalle de servicios</div><table><thead><tr><th>Descripcion</th><th style="text-align:center;width:60px">Uds</th><th style="text-align:right;width:110px">Precio/ud</th><th style="text-align:right;width:110px">Importe</th></tr></thead><tbody>${items.map((it, i) => { const cant = parseFloat(it.cantidad) || 1; const pu = parseFloat(it.precio_unit) || 0; return '<tr><td><div class="in">' + it.descripcion + '</div>' + (it.detalle ? '<div class="id">' + it.detalle + '</div>' : '') + '</td><td style="text-align:center">' + cant + '</td><td class="ip">' + formatEur(pu) + '</td><td class="ip">' + formatEur(cant * pu) + '</td></tr>' }).join('')}</tbody></table><div class="totals">${parseFloat(p.descuento) > 0 ? '<div class="tr-row sub"><span>Subtotal</span><span>' + formatEur(subtotal) + '</span></div><div class="tr-row desc"><span>Descuento (' + p.descuento + '%)</span><span>-' + formatEur(desc) + '</span></div>' : ''}<div class="tr-row sub"><span>Base imponible</span><span>${formatEur(base)}</span></div><div class="tr-row iva"><span>IVA (${p.iva || 21}%)</span><span>${formatEur(ivaAmt)}</span></div><div class="tr-row total"><span>TOTAL</span><span>${formatEur(total)}</span></div></div></div>${p.condiciones ? '<div class="section"><div class="st">Condiciones</div><div class="cond">' + p.condiciones + '</div></div>' : ''}</div><div class="footer"><div><div style="color:white;font-weight:600;margin-bottom:2px">ONESEVEN IA</div><div>onesevenia.com</div></div><div style="text-align:right"><div style="color:white;font-weight:600;margin-bottom:2px">${respNombre}</div><div>${respEmail}</div></div></div></div></div></body></html>`
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${ref}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.6}.topbar{position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:8px}.back-btn{background:rgba(255,255,255,.1);color:white;border:none;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer}.save-btn{background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}.topbar-title{color:rgba(255,255,255,.7);font-size:12px;flex:1;text-align:center}.wrapper{padding-top:52px}.page{max-width:794px;margin:0 auto}.header{background:linear-gradient(135deg,#0a0a1a,#1a1a3e);color:white;padding:36px 48px 28px}.ht{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}.emp-block{flex:1}.emp-logo{height:36px;filter:brightness(0)invert(1);margin-bottom:10px;display:block}.emp-name{font-size:15px;font-weight:700;color:white;margin-bottom:3px}.emp-data{font-size:11px;color:rgba(255,255,255,.5);line-height:1.9}.ref-block{text-align:right;flex-shrink:0}.ref-badge{display:inline-block;background:rgba(99,102,241,.3);color:#c7d2fe;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.04em;margin-bottom:8px}.ref-meta{font-size:11px;color:rgba(255,255,255,.5);line-height:1.9}.doc-title{font-size:20px;font-weight:300;margin-bottom:4px}.doc-sub{font-size:13px;color:rgba(255,255,255,.6)}.ab{height:3px;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4)}.body{padding:32px 48px}.section{margin-bottom:22px}.st{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6366f1;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #e8e8f0}.parties{display:grid;grid-template-columns:1fr 1fr;gap:14px}.party{background:#f8f8ff;border-radius:8px;padding:14px;border-left:3px solid #6366f1}.party-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:5px}.party-name{font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:3px}.party-detail{font-size:11px;color:#666;line-height:1.8}table{width:100%;border-collapse:separate;border-spacing:0}th{background:#1a1a2e;color:white;padding:9px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0;text-align:right}td{padding:10px 12px;border-bottom:1px solid #f0f0f8;vertical-align:top;font-size:13px}tr:nth-child(even) td{background:#fafaff}.in{font-weight:600;color:#1a1a2e}.id{font-size:11px;color:#888;margin-top:2px}.ip{text-align:right;font-weight:600;color:#1a1a2e}.tc{text-align:center}.totals-box{margin-top:10px;margin-left:auto;width:300px;background:#f8f8ff;border-radius:8px;padding:14px;border:1px solid #e8e8f0}.t-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#555;border-bottom:1px solid #eee}.t-row:last-child{border-bottom:none}.t-row.total-row{margin-top:6px;padding-top:10px;border-top:2px solid #6366f1!important;font-weight:700;font-size:15px;color:#1a1a2e}.t-row.desc-row{color:#ef4444}.cond-box{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:14px;font-size:12px;color:#555;line-height:1.9;white-space:pre-line}.iban-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#166534;margin-top:12px}.footer{background:#0a0a1a;color:rgba(255,255,255,.45);padding:18px 48px;display:flex;justify-content:space-between;align-items:center;font-size:11px;line-height:1.7}.footer-left div:first-child{color:rgba(255,255,255,.8);font-weight:600;margin-bottom:2px}.footer-right{text-align:right}.footer-right div:first-child{color:rgba(255,255,255,.8);font-weight:600;margin-bottom:2px}@media print{.topbar{display:none}.wrapper{padding-top:0}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}@page{margin:0;size:A4}}</style></head>
+<body>
+<div class="topbar">
+  <button class="back-btn" onclick="window.close()">&#8592; Cerrar</button>
+  <span class="topbar-title">${ref} &mdash; ${cliente?.nombre || ''}</span>
+  <button class="save-btn" onclick="window.print()">Guardar PDF</button>
+</div>
+<div class="wrapper"><div class="page">
+<div class="header">
+  <div class="ht">
+    <div class="emp-block">
+      <img class="emp-logo" src="${emp.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'}" alt="${emp.nombre || 'ONESEVEN IA'}" onerror="this.style.display='none'">
+      <div class="emp-name">${emp.nombre || 'ONESEVEN IA'}</div>
+      <div class="emp-data">
+        ${emp.cif ? `CIF: ${emp.cif}<br>` : ''}
+        ${empDireccion ? `${empDireccion}<br>` : ''}
+        ${emp.pais || ''}${emp.pais && empDireccion ? '' : ''}
+        ${emp.telefono ? `<br>Tel: ${emp.telefono}` : ''}
+        ${emp.email ? `<br>${emp.email}` : ''}
+        ${emp.web ? `<br>${emp.web}` : ''}
+      </div>
+    </div>
+    <div class="ref-block">
+      <div class="ref-badge">${ref}</div>
+      <div class="ref-meta">
+        Fecha: ${formatDate(p.fecha)}<br>
+        ${p.validez ? `Validez: ${p.validez} dias<br>` : ''}
+        Responsable: ${respNombre}
+      </div>
+    </div>
+  </div>
+  <div class="doc-title">${p.titulo}</div>
+  <div class="doc-sub">Para ${cliente?.nombre || ''}${cliente?.empresa ? ' &mdash; ' + cliente.empresa : ''}</div>
+</div>
+<div class="ab"></div>
+<div class="body">
+
+  <div class="section">
+    <div class="st">Partes del presupuesto</div>
+    <div class="parties">
+      <div class="party">
+        <div class="party-label">Emisor</div>
+        <div class="party-name">${emp.nombre || 'ONESEVEN IA'}</div>
+        <div class="party-detail">
+          ${emp.cif ? `CIF: ${emp.cif}<br>` : ''}
+          ${empDireccion ? `${empDireccion}<br>` : ''}
+          ${emp.telefono ? `Tel: ${emp.telefono}<br>` : ''}
+          ${respEmail}
+        </div>
+      </div>
+      <div class="party">
+        <div class="party-label">Destinatario</div>
+        <div class="party-name">${cliente?.nombre || '&mdash;'}</div>
+        <div class="party-detail">
+          ${cliente?.empresa ? `${cliente.empresa}<br>` : ''}
+          ${cliente?.cif ? `CIF/NIF: ${cliente.cif}<br>` : ''}
+          ${cliente?.email ? `${cliente.email}<br>` : ''}
+          ${cliente?.telefono ? `Tel: ${cliente.telefono}` : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  ${p.intro ? `<div class="section"><p style="font-size:13px;color:#555;line-height:1.8;background:#fafafa;padding:14px;border-radius:6px;border:1px solid #eee">${p.intro}</p></div>` : ''}
+
+  <div class="section">
+    <div class="st">Detalle de servicios</div>
+    <table>
+      <thead><tr><th>Descripcion</th><th class="tc" style="width:60px">Uds</th><th style="text-align:right;width:110px">Precio/ud</th><th style="text-align:right;width:120px">Importe</th></tr></thead>
+      <tbody>
+        ${items.map(it => {
+          const cant = parseFloat(it.cantidad) || 1
+          const pu = parseFloat(it.precio_unit) || 0
+          return `<tr><td><div class="in">${it.descripcion}</div>${it.detalle ? `<div class="id">${it.detalle}</div>` : ''}</td><td class="tc">${cant}</td><td class="ip">${formatEur(pu)}</td><td class="ip">${formatEur(cant * pu)}</td></tr>`
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="totals-box">
+      ${parseFloat(p.descuento) > 0 ? `
+        <div class="t-row"><span>Subtotal</span><span>${formatEur(subtotal)}</span></div>
+        <div class="t-row desc-row"><span>Descuento (${p.descuento}%)</span><span>-${formatEur(desc)}</span></div>
+        <div class="t-row"><span>Base imponible</span><span>${formatEur(base)}</span></div>
+      ` : `<div class="t-row"><span>Base imponible</span><span>${formatEur(base)}</span></div>`}
+      <div class="t-row"><span>IVA (${p.iva || 21}%)</span><span>${formatEur(ivaAmt)}</span></div>
+      <div class="t-row total-row"><span>TOTAL</span><span>${formatEur(total)}</span></div>
+    </div>
+    ${emp.iban ? `<div class="iban-box">Datos bancarios para el pago &mdash; ${emp.iban}${emp.banco ? ' &mdash; ' + emp.banco : ''}</div>` : ''}
+  </div>
+
+  ${p.condiciones ? `<div class="section"><div class="st">Condiciones</div><div class="cond-box">${p.condiciones}</div></div>` : ''}
+  ${emp.nota_pie ? `<div class="section"><p style="font-size:11px;color:#888;text-align:center">${emp.nota_pie}</p></div>` : ''}
+
+</div>
+<div class="footer">
+  <div class="footer-left"><div>${emp.nombre || 'ONESEVEN IA'}</div><div>${emp.web || 'onesevenia.com'}</div>${emp.cif ? `<div>CIF: ${emp.cif}</div>` : ''}</div>
+  <div class="footer-right"><div>${respNombre}</div><div>${respEmail}</div></div>
+</div>
+</div></div></body></html>`
 }
 
-function abrirPresupuesto({ p, cliente }) {
+function abrirPresupuesto({ p, cliente, empresa }) {
   const win = window.open('', '_blank')
-  win.document.write(generarHTMLPresupuesto({ p, cliente }))
+  win.document.write(generarHTMLPresupuesto({ p, cliente, empresa }))
   win.document.close()
 }
 
-// ─── Formulario ───────────────────────────────────────────────────────────────
+// ─── Modal datos empresa ──────────────────────────────────────────────────────
+function ModalEmpresa({ config, onClose, onSave }) {
+  const [form, setForm] = useState({
+    nombre: '', cif: '', direccion: '', ciudad: '', cp: '', pais: 'España',
+    telefono: '', email: '', web: '', iban: '', banco: '', nota_pie: '',
+    logo_url: 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png',
+    ...config,
+  })
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 600, border: '1px solid var(--border)', overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg1)', zIndex: 1 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>Datos de mi empresa</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Aparecen en todos los presupuestos generados</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><CloseIcon /></button>
+        </div>
+        <div style={{ padding: '20px' }}>
+          {/* Datos principales */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Identificacion</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group"><label className="form-label">Nombre empresa *</label><input className="form-input" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="ONESEVEN IA S.L." /></div>
+            <div className="form-group"><label className="form-label">CIF / NIF</label><input className="form-input" value={form.cif} onChange={e => set('cif', e.target.value)} placeholder="B12345678" /></div>
+          </div>
+
+          {/* Direccion */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12, marginTop: 4 }}>Direccion</div>
+          <div className="form-group"><label className="form-label">Direccion</label><input className="form-input" value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Calle Ejemplo 123, 1A" /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group"><label className="form-label">CP</label><input className="form-input" value={form.cp} onChange={e => set('cp', e.target.value)} placeholder="28001" /></div>
+            <div className="form-group"><label className="form-label">Ciudad</label><input className="form-input" value={form.ciudad} onChange={e => set('ciudad', e.target.value)} placeholder="Madrid" /></div>
+            <div className="form-group"><label className="form-label">Pais</label><input className="form-input" value={form.pais} onChange={e => set('pais', e.target.value)} placeholder="España" /></div>
+          </div>
+
+          {/* Contacto */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12, marginTop: 4 }}>Contacto</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group"><label className="form-label">Telefono</label><input className="form-input" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+34 600 000 000" /></div>
+            <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={form.email} onChange={e => set('email', e.target.value)} placeholder="pablo@onesevenia.com" /></div>
+            <div className="form-group"><label className="form-label">Web</label><input className="form-input" value={form.web} onChange={e => set('web', e.target.value)} placeholder="onesevenia.com" /></div>
+          </div>
+
+          {/* Banco */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12, marginTop: 4 }}>Datos bancarios</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 12px' }}>
+            <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban} onChange={e => set('iban', e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" /></div>
+            <div className="form-group"><label className="form-label">Banco</label><input className="form-input" value={form.banco} onChange={e => set('banco', e.target.value)} placeholder="Banco Sabadell" /></div>
+          </div>
+
+          {/* Extra */}
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12, marginTop: 4 }}>Extras PDF</div>
+          <div className="form-group" style={{ marginBottom: 20 }}>
+            <label className="form-label">Nota al pie del PDF <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
+            <input className="form-input" value={form.nota_pie} onChange={e => set('nota_pie', e.target.value)} placeholder="Ej: Sujeto a retencion de IRPF del 15%" />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar datos empresa'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Formulario presupuesto ───────────────────────────────────────────────────
 function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
   const isEdit = !!presupuesto?.id
   const defaultItems = [{ descripcion: '', detalle: '', cantidad: '1', precio_unit: '' }]
@@ -55,9 +234,8 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
     cliente_id: '', titulo: 'Presupuesto de servicios',
     fecha: new Date().toISOString().split('T')[0], validez: '15',
     intro: '', items: defaultItems,
-    condiciones: 'El presupuesto tiene una validez de 15 dias naturales desde su emision.\n\nEl 50% del importe se abona al inicio del proyecto y el 50% restante a la entrega.\n\nPrecios sin IVA.',
-    responsable: 'pablo', estado: 'borrador',
-    descuento: '0', iva: '21',
+    condiciones: 'El presupuesto tiene una validez de 15 dias naturales desde su emision.\n\nEl 50% del importe se abona al inicio del proyecto y el 50% restante a la entrega.\n\nPrecios sin IVA. IVA aplicable segun normativa vigente.',
+    responsable: 'pablo', estado: 'borrador', descuento: '0', iva: '21',
     ...presupuesto,
     items: presupuesto?.items?.length ? presupuesto.items : defaultItems,
   })
@@ -68,12 +246,17 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
   const updateItem = (i, k, v) => set('items', form.items.map((item, idx) => idx === i ? { ...item, [k]: v } : item))
   const { subtotal, desc, base, ivaAmt, total } = calcTotales({ items: form.items, descuento: form.descuento, iva: form.iva })
 
+  // Cliente seleccionado para mostrar datos
+  const clienteSeleccionado = clientes.find(c => c.id === form.cliente_id)
+
   return (
     <div>
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>
           {isEdit ? 'Editar presupuesto' : 'Nuevo presupuesto'}
         </div>
+
+        {/* Selector cliente con datos autorellenados */}
         <div className="form-group">
           <label className="form-label">Cliente *</label>
           <select className="form-select" value={form.cliente_id} onChange={e => set('cliente_id', e.target.value)}>
@@ -81,6 +264,18 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
             {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}{c.empresa ? ` · ${c.empresa}` : ''}</option>)}
           </select>
         </div>
+
+        {/* Datos del cliente autorellenados */}
+        {clienteSeleccionado && (
+          <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', marginBottom: 14, border: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text0)' }}>{clienteSeleccionado.nombre}</span>
+            {clienteSeleccionado.empresa && <span>{clienteSeleccionado.empresa}</span>}
+            {clienteSeleccionado.cif && <span style={{ color: 'var(--accent2)' }}>CIF/NIF: {clienteSeleccionado.cif}</span>}
+            {clienteSeleccionado.email && <span>{clienteSeleccionado.email}</span>}
+            {clienteSeleccionado.telefono && <span>{clienteSeleccionado.telefono}</span>}
+          </div>
+        )}
+
         <div className="form-group">
           <label className="form-label">Titulo del presupuesto</label>
           <input className="form-input" value={form.titulo} onChange={e => set('titulo', e.target.value)} />
@@ -93,22 +288,21 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
           <div className="form-group"><label className="form-label">Estado</label><select className="form-select" value={form.estado} onChange={e => set('estado', e.target.value)}>{Object.entries(ESTADO_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
-          <div className="form-group"><label className="form-label">Responsable</label><select className="form-select" value={form.responsable} onChange={e => set('responsable', e.target.value)}><option value="pablo">Pablo Puado</option><option value="alberto">Alberto</option></select></div>
+          <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label">Responsable</label><select className="form-select" value={form.responsable} onChange={e => set('responsable', e.target.value)}><option value="pablo">Pablo Puado</option><option value="alberto">Alberto</option></select></div>
         </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Presentacion / Descripcion del proyecto</label>
+        <div className="form-group" style={{ marginBottom: 0, marginTop: 12 }}>
+          <label className="form-label">Descripcion del proyecto <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
           <textarea className="form-textarea" value={form.intro} onChange={e => set('intro', e.target.value)} placeholder="Describe brevemente el alcance del proyecto..." style={{ minHeight: 70 }} />
         </div>
       </div>
 
-      {/* Items */}
+      {/* Lineas */}
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Lineas del presupuesto</div>
           <button className="btn btn-ghost btn-sm" onClick={addItem}>+ Anadir linea</button>
         </div>
-        {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 120px 32px', gap: '0 8px', marginBottom: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 120px 32px', gap: '0 8px', marginBottom: 6 }}>
           <label className="form-label">Descripcion</label>
           <label className="form-label">Detalle</label>
           <label className="form-label">Uds</label>
@@ -116,22 +310,20 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
           <div />
         </div>
         {form.items.map((item, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 120px 32px', gap: '0 8px', marginBottom: 7, alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 120px 32px', gap: '0 8px', marginBottom: 7, alignItems: 'center' }}>
             <input className="form-input" value={item.descripcion} onChange={e => updateItem(i, 'descripcion', e.target.value)} placeholder="Nombre del servicio" />
-            <input className="form-input" value={item.detalle || ''} onChange={e => updateItem(i, 'detalle', e.target.value)} placeholder="Descripcion adicional" />
+            <input className="form-input" value={item.detalle || ''} onChange={e => updateItem(i, 'detalle', e.target.value)} placeholder="Detalle adicional" />
             <input className="form-input" type="number" value={item.cantidad || '1'} onChange={e => updateItem(i, 'cantidad', e.target.value)} min="1" />
             <input className="form-input" type="number" value={item.precio_unit || ''} onChange={e => updateItem(i, 'precio_unit', e.target.value)} placeholder="0" />
             <button className="btn-icon" style={{ width: 32, height: 36, color: 'var(--red)' }} onClick={() => form.items.length > 1 && removeItem(i)}><TrashIcon /></button>
           </div>
         ))}
-
-        {/* Totales */}
-        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-          <div style={{ maxWidth: 300, marginLeft: 'auto' }}>
+        <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ maxWidth: 280, marginLeft: 'auto' }}>
             {[
-              { label: 'Subtotal', value: subtotal, show: true },
+              { label: 'Subtotal', value: subtotal, show: parseFloat(form.descuento) > 0 },
               { label: `Descuento (${form.descuento}%)`, value: -desc, show: parseFloat(form.descuento) > 0, color: 'var(--red)' },
-              { label: 'Base imponible', value: base, show: parseFloat(form.descuento) > 0 },
+              { label: 'Base imponible', value: base, show: true },
               { label: `IVA (${form.iva}%)`, value: ivaAmt, show: true, color: 'var(--text3)' },
             ].filter(r => r.show).map(r => (
               <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: r.color || 'var(--text2)' }}>
@@ -163,16 +355,16 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
 }
 
 // ─── Modal envio ──────────────────────────────────────────────────────────────
-function ModalEnvio({ presupuesto, cliente, onClose, onEnviado }) {
+function ModalEnvio({ presupuesto, cliente, empresa, onClose, onEnviado }) {
   const [copied, setCopied] = useState(false)
   const { subtotal, desc, base, ivaAmt, total } = calcTotales({ items: presupuesto.items, descuento: presupuesto.descuento, iva: presupuesto.iva })
   const respNombre = presupuesto.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
-  const respEmail = presupuesto.responsable === 'pablo' ? 'pablo@onesevenia.com' : 'alberto@onesevenia.com'
+  const respEmail = presupuesto.responsable === 'pablo' ? (empresa?.email || 'pablo@onesevenia.com') : 'alberto@onesevenia.com'
   const ref = `PRES-${new Date(presupuesto.fecha || presupuesto.created_at).getFullYear()}-${presupuesto.id?.slice(-3).toUpperCase() || '000'}`
 
   const msgWA = `Hola ${cliente?.nombre?.split(' ')[0] || ''}!
 
-Te envio el presupuesto "${presupuesto.titulo}" (${ref}) de ONESEVEN IA.
+Te envio el presupuesto "${presupuesto.titulo}" (${ref}) de ${empresa?.nombre || 'ONESEVEN IA'}.
 
 Detalle:
 ${(presupuesto.items || []).filter(it => it.descripcion).map(it => `- ${it.descripcion}: ${formatEur((parseFloat(it.cantidad)||1)*(parseFloat(it.precio_unit)||0))}`).join('\n')}
@@ -183,10 +375,10 @@ Total: ${formatEur(total)}
 
 Valido ${presupuesto.validez || 15} dias.
 
-ONESEVEN IA - onesevenia.com`
+${empresa?.nombre || 'ONESEVEN IA'} - ${empresa?.web || 'onesevenia.com'}`
 
   const asunto = `Presupuesto ${ref} - ${presupuesto.titulo}`
-  const msgEmail = `Hola ${cliente?.nombre?.split(' ')[0] || ''},\n\nAdjunto el presupuesto ${ref} solicitado.\n\nBase imponible: ${formatEur(base)}\nIVA (${presupuesto.iva || 21}%): ${formatEur(ivaAmt)}\nTotal: ${formatEur(total)}\n\nValido durante ${presupuesto.validez || 15} dias.\n\n${respNombre}\nONESEVEN IA - ${respEmail}`
+  const msgEmail = `Hola ${cliente?.nombre?.split(' ')[0] || ''},\n\nAdjunto el presupuesto ${ref}.\n\nBase imponible: ${formatEur(base)}\nIVA (${presupuesto.iva || 21}%): ${formatEur(ivaAmt)}\nTotal: ${formatEur(total)}\n\nValido durante ${presupuesto.validez || 15} dias.\n\n${respNombre}\n${empresa?.nombre || 'ONESEVEN IA'} - ${respEmail}`
 
   const copiar = (txt) => { navigator.clipboard.writeText(txt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }
 
@@ -199,32 +391,28 @@ ONESEVEN IA - onesevenia.com`
           <button onClick={onClose} style={{ background: 'var(--bg3)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CloseIcon /></button>
         </div>
         <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Ver PDF */}
-          <button onClick={() => abrirPresupuesto({ p: presupuesto, cliente })} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+          <button onClick={() => abrirPresupuesto({ p: presupuesto, cliente, empresa })} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}><DownloadIcon /></div>
-            <div><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Ver presupuesto</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Abre el PDF · guarda desde la ventana</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Ver presupuesto PDF</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Abre el PDF con datos completos · guarda desde la ventana</div></div>
           </button>
-          {/* WA */}
           {cliente?.telefono && (
             <div style={{ borderRadius: 12, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.05)', overflow: 'hidden' }}>
-              <button onClick={() => { const url = `https://wa.me/${cliente.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(msgWA)}`; window.open(url,'_blank'); onEnviado('wa') }} style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+              <button onClick={() => { window.open(`https://wa.me/${cliente.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(msgWA)}`, '_blank'); onEnviado('wa') }} style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(37,211,102,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#25d366', flexShrink: 0 }}><WAIcon /></div>
                 <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>WhatsApp</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>{cliente.telefono}</div></div>
-                <span style={{ fontSize: 18, color: '#25d366' }}>&#8250;</span>
+                <span style={{ fontSize: 18, color: '#25d366' }}>›</span>
               </button>
-              <div style={{ margin: '0 14px 14px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto' }}>{msgWA}</div>
+              <div style={{ margin: '0 14px 6px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto' }}>{msgWA}</div>
               <div style={{ padding: '0 14px 12px' }}><button onClick={() => copiar(msgWA)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--border2)', background: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><CopyIcon /> {copied ? 'Copiado' : 'Copiar mensaje'}</button></div>
             </div>
           )}
-          {/* Email */}
           {cliente?.email && (
             <div style={{ borderRadius: 12, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)', overflow: 'hidden' }}>
-              <button onClick={() => { const url = `https://mail.google.com/mail/?view=cm&fs=1&from=puado@onesevenia.com&to=${encodeURIComponent(cliente.email)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(msgEmail)}`; window.open(url,'_blank'); onEnviado('email') }} style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+              <button onClick={() => { window.open(`https://mail.google.com/mail/?view=cm&fs=1&from=${encodeURIComponent(respEmail)}&to=${encodeURIComponent(cliente.email)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(msgEmail)}`, '_blank'); onEnviado('email') }} style={{ width: '100%', padding: '14px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}><MailIcon /></div>
                 <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Gmail</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>{cliente.email}</div></div>
-                <span style={{ fontSize: 18, color: 'var(--accent2)' }}>&#8250;</span>
+                <span style={{ fontSize: 18, color: 'var(--accent2)' }}>›</span>
               </button>
-              <div style={{ margin: '0 14px 14px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11, color: 'var(--text2)', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto' }}>{msgEmail}</div>
               <div style={{ padding: '0 14px 12px' }}><button onClick={() => copiar(msgEmail)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--border2)', background: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><CopyIcon /> {copied ? 'Copiado' : 'Copiar mensaje'}</button></div>
             </div>
           )}
@@ -238,10 +426,12 @@ ONESEVEN IA - onesevenia.com`
 export default function Presupuestos() {
   const { clientes } = useClientes()
   const { presupuestos, crear, actualizar, eliminar } = usePresupuestos()
+  const { config: empresa, guardar: guardarEmpresa } = useEmpresaConfig()
   const [vista, setVista] = useState('lista')
   const [editando, setEditando] = useState(null)
   const [enviando, setEnviando] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [showEmpresa, setShowEmpresa] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
 
@@ -261,7 +451,9 @@ export default function Presupuestos() {
 
   const handleEnviado = async (tipo) => {
     if (enviando?.id) {
-      await actualizar(enviando.id, tipo === 'wa' ? { enviado_wa: true, estado: 'enviado', fecha_envio: new Date().toISOString() } : { enviado_email: true, estado: 'enviado', fecha_envio: new Date().toISOString() })
+      await actualizar(enviando.id, tipo === 'wa'
+        ? { enviado_wa: true, estado: 'enviado', fecha_envio: new Date().toISOString() }
+        : { enviado_email: true, estado: 'enviado', fecha_envio: new Date().toISOString() })
     }
     setEnviando(null)
   }
@@ -274,7 +466,7 @@ export default function Presupuestos() {
   if (vista === 'form') {
     return (
       <Layout title={editando?.id ? 'Editar presupuesto' : 'Nuevo presupuesto'} subtitle="Rellena los datos del presupuesto">
-        <div style={{ maxWidth: 800 }}>
+        <div style={{ maxWidth: 820 }}>
           <FormularioPresupuesto presupuesto={editando} clientes={clientes} onSave={handleSave} onCancel={() => { setVista('lista'); setEditando(null) }} />
         </div>
       </Layout>
@@ -283,8 +475,21 @@ export default function Presupuestos() {
 
   return (
     <Layout title="Presupuestos" subtitle={`${filtrados.length} presupuesto${filtrados.length !== 1 ? 's' : ''}`} actions={
-      <button className="btn btn-primary" onClick={() => { setEditando(null); setVista('form') }}><PlusIcon /> Nuevo presupuesto</button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => setShowEmpresa(true)} style={{ gap: 5 }}>
+          <SettingsIcon /> Mi empresa
+        </button>
+        <button className="btn btn-primary" onClick={() => { setEditando(null); setVista('form') }}><PlusIcon /> Nuevo presupuesto</button>
+      </div>
     }>
+      {/* Aviso si no hay datos empresa */}
+      {empresa && !empresa.cif && !empresa.direccion && (
+        <div style={{ padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 'var(--radius)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--amber)' }}>Completa los datos de tu empresa para que aparezcan en los PDFs</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowEmpresa(true)}>Configurar</button>
+        </div>
+      )}
+
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 20 }}>
         {[
@@ -336,6 +541,7 @@ export default function Presupuestos() {
                   </div>
                   <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
                     <span>{cliente?.nombre}{cliente?.empresa ? ` · ${cliente.empresa}` : ''}</span>
+                    {cliente?.cif && <span style={{ color: 'var(--accent2)' }}>CIF: {cliente.cif}</span>}
                     <span>{ref}</span>
                     <span>{formatDate(p.fecha)}</span>
                     {p.validez && <span>Valido {p.validez} dias</span>}
@@ -354,9 +560,9 @@ export default function Presupuestos() {
                   {total > 0 && <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--green)', marginRight: 4 }}>{formatEur(total)}</span>}
                   {cliente?.telefono && <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviando(p)}><WAIcon /></button>}
                   {cliente?.email && <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent2)', borderRadius: 8, border: '1px solid var(--accent-dim)', background: 'var(--accent-dim)' }} onClick={() => setEnviando(p)}><MailIcon /></button>}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => abrirPresupuesto({ p, cliente })}><DownloadIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => abrirPresupuesto({ p, cliente, empresa })}><DownloadIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { setEditando(p); setVista('form') }}><EditIcon /></button>
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { const { id, created_at, ...d } = p; await crear({ ...d, titulo: p.titulo + ' (copia)', estado: 'borrador', fecha: new Date().toISOString().split('T')[0] }) }}><CopyIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { const { id, created_at, enviado_wa, enviado_email, fecha_envio, ...d } = p; await crear({ ...d, titulo: p.titulo + ' (copia)', estado: 'borrador', fecha: new Date().toISOString().split('T')[0] }) }}><CopyIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--red)' }} onClick={() => setConfirmDelete(p)}><TrashIcon /></button>
                 </div>
               </div>
@@ -365,14 +571,14 @@ export default function Presupuestos() {
         })}
       </div>
 
-      {enviando && <ModalEnvio presupuesto={enviando} cliente={clientes.find(c => c.id === enviando.cliente_id) || enviando.clientes} onClose={() => setEnviando(null)} onEnviado={handleEnviado} />}
+      {enviando && <ModalEnvio presupuesto={enviando} cliente={clientes.find(c => c.id === enviando.cliente_id) || enviando.clientes} empresa={empresa} onClose={() => setEnviando(null)} onEnviado={handleEnviado} />}
+      {showEmpresa && <ModalEmpresa config={empresa} onClose={() => setShowEmpresa(false)} onSave={guardarEmpresa} />}
 
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && setConfirmDelete(null)}>
           <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', padding: '28px', maxWidth: 380, width: '100%', border: '1px solid var(--border)', textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>!</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text0)', marginBottom: 8 }}>Eliminar presupuesto</div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>Eliminar "<strong>{confirmDelete.titulo}</strong>"? Esta accion no se puede deshacer.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)', marginBottom: 8 }}>Eliminar "{confirmDelete.titulo}"?</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>Esta accion no se puede deshacer.</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>Cancelar</button>
               <button className="btn" style={{ background: 'var(--red)', color: '#fff', border: 'none' }} onClick={async () => { await eliminar(confirmDelete.id); setConfirmDelete(null) }}>Eliminar</button>
