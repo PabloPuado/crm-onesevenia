@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
 import { useGastos } from '../hooks/useData'
 import { formatEur } from '../lib/constants'
+const formatDec = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(n) || 0)
 
 function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg> }
 function EditIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 2l2 2-7 7H2V9L9 2z"/></svg> }
@@ -67,15 +68,16 @@ function BarChart({ data, maxVal, height = 160 }) {
 // ─── Modal gasto ──────────────────────────────────────────────────────────────
 function ModalGasto({ gasto, onClose, onSave }) {
   const [form, setForm] = useState({
-    nombre: '', categoria: 'software', tipo: 'fijo', importe: '',
-    frecuencia: 'mensual', activo: true, notas: '',
+    nombre: '', categoria: 'software', categoria_custom: '', tipo: 'fijo',
+    importe: '', frecuencia: 'mensual', dia_cobro: '', activo: true, notas: '',
     ...gasto,
   })
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const esPersonalizada = form.categoria === '__custom__'
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 480, border: '1px solid var(--border)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 500, border: '1px solid var(--border)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>{gasto?.id ? 'Editar gasto' : 'Nuevo gasto'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><CloseIcon /></button>
@@ -85,11 +87,16 @@ function ModalGasto({ gasto, onClose, onSave }) {
             <label className="form-label">Nombre del gasto *</label>
             <input className="form-input" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Suscripcion n8n, Alquiler oficina..." autoFocus />
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div className="form-group">
               <label className="form-label">Categoria</label>
-              <select className="form-select" value={form.categoria} onChange={e => set('categoria', e.target.value)}>
+              <select className="form-select" value={esPersonalizada ? '__custom__' : form.categoria} onChange={e => {
+                if (e.target.value === '__custom__') { set('categoria', '__custom__') }
+                else { set('categoria', e.target.value); set('categoria_custom', '') }
+              }}>
                 {CATEGORIAS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                <option value="__custom__">+ Personalizada...</option>
               </select>
             </div>
             <div className="form-group">
@@ -100,10 +107,18 @@ function ModalGasto({ gasto, onClose, onSave }) {
               </select>
             </div>
           </div>
+
+          {esPersonalizada && (
+            <div className="form-group">
+              <label className="form-label">Nombre de categoria personalizada *</label>
+              <input className="form-input" value={form.categoria_custom} onChange={e => set('categoria_custom', e.target.value)} placeholder="Ej: Subscripciones IA, Transporte..." />
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div className="form-group">
               <label className="form-label">Importe (EUR)</label>
-              <input className="form-input" type="number" value={form.importe} onChange={e => set('importe', e.target.value)} placeholder="0" />
+              <input className="form-input" type="number" step="0.01" value={form.importe} onChange={e => set('importe', e.target.value)} placeholder="0.00" />
             </div>
             <div className="form-group">
               <label className="form-label">Frecuencia</label>
@@ -116,17 +131,48 @@ function ModalGasto({ gasto, onClose, onSave }) {
               </select>
             </div>
           </div>
+
+          {form.frecuencia !== 'unico' && (
+            <div className="form-group">
+              <label className="form-label">
+                Dia del mes en que se cobra
+                <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(opcional — ej: 1, 15, 28...)</span>
+              </label>
+              <input
+                className="form-input"
+                type="number"
+                min="1" max="31"
+                value={form.dia_cobro || ''}
+                onChange={e => set('dia_cobro', e.target.value ? parseInt(e.target.value) : null)}
+                placeholder="Ej: 1 para el primero de cada mes"
+              />
+            </div>
+          )}
+
           <div className="form-group">
-            <label className="form-label">Notas (opcional)</label>
+            <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
             <input className="form-input" value={form.notas || ''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales..." />
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
             <input type="checkbox" id="activo" checked={form.activo} onChange={e => set('activo', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
             <label htmlFor="activo" style={{ fontSize: 13, color: 'var(--text1)', cursor: 'pointer' }}>Gasto activo (incluir en calculos)</label>
           </div>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button className="btn btn-primary" onClick={() => form.nombre && form.importe ? onSave(form) : alert('Rellena nombre e importe')}>
+            <button className="btn btn-primary" onClick={() => {
+              if (!form.nombre || !form.importe) return alert('Rellena nombre e importe')
+              if (esPersonalizada && !form.categoria_custom) return alert('Escribe el nombre de la categoria personalizada')
+              const payload = {
+                ...form,
+                categoria: esPersonalizada ? form.categoria_custom : form.categoria,
+                categoria_custom: esPersonalizada ? form.categoria_custom : '',
+                importe: parseFloat(form.importe),
+                dia_cobro: form.dia_cobro ? parseInt(form.dia_cobro) : null,
+              }
+              onSave(payload)
+            }}>
               {gasto?.id ? 'Guardar cambios' : 'Anadir gasto'}
             </button>
           </div>
@@ -199,10 +245,10 @@ export default function Gastos() {
       {/* KPIs principales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Coste mensual total', value: formatEur(totalMensual), sub: 'gastos activos', color: 'var(--accent2)', big: true },
-          { label: 'Coste anual total', value: formatEur(totalAnual), sub: 'proyeccion', color: 'var(--text0)' },
-          { label: 'Costes fijos / mes', value: formatEur(totalFijo), sub: `${totalMensual > 0 ? Math.round(totalFijo/totalMensual*100) : 0}% del total`, color: '#6366f1' },
-          { label: 'Costes variables / mes', value: formatEur(totalVariable), sub: `${totalMensual > 0 ? Math.round(totalVariable/totalMensual*100) : 0}% del total`, color: 'var(--amber)' },
+          { label: 'Coste mensual total', value: formatDec(totalMensual), sub: 'gastos activos', color: 'var(--accent2)', big: true },
+          { label: 'Coste anual total', value: formatDec(totalAnual), sub: 'proyeccion', color: 'var(--text0)' },
+          { label: 'Costes fijos / mes', value: formatDec(totalFijo), sub: `${totalMensual > 0 ? Math.round(totalFijo/totalMensual*100) : 0}% del total`, color: '#6366f1' },
+          { label: 'Costes variables / mes', value: formatDec(totalVariable), sub: `${totalMensual > 0 ? Math.round(totalVariable/totalMensual*100) : 0}% del total`, color: 'var(--amber)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '14px 16px' }}>
             <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.label}</div>
@@ -313,14 +359,15 @@ export default function Gastos() {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text3)' }}>
                       {formatEur(parseFloat(g.importe))} {g.frecuencia === 'mensual' ? '/mes' : g.frecuencia === 'trimestral' ? '/trimestre' : g.frecuencia === 'semestral' ? '/semestre' : g.frecuencia === 'anual' ? '/ano' : '(pago unico)'}
-                      {g.notas && ` · ${g.notas}`}
+                      {g.dia_cobro ? ` · cobra el dia ${g.dia_cobro}` : ''}
+                      {g.notas ? ` · ${g.notas}` : ''}
                     </div>
                   </div>
 
                   {/* Importes */}
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {mensual > 0 && <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>{formatEur(mensual)}<span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'inherit', fontWeight: 400 }}>/mes</span></div>}
-                    <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{formatEur(anual)}/ano</div>
+                    {mensual > 0 && <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>{formatDec(mensual)}<span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'inherit', fontWeight: 400 }}>/mes</span></div>}
+                    <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{formatDec(anual)}/ano</div>
                   </div>
 
                   {/* Acciones */}
@@ -335,10 +382,10 @@ export default function Gastos() {
             {/* Total lista */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 18px', borderTop: '2px solid var(--border)', gap: 24 }}>
               <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                Total filtrado: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatEur(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeMensual(g),0))}/mes</strong>
+                Total filtrado: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeMensual(g),0))}/mes</strong>
               </div>
               <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                Anual: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatEur(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeAnual(g),0))}</strong>
+                Anual: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeAnual(g),0))}</strong>
               </div>
             </div>
           </div>
