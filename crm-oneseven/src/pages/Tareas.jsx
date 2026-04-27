@@ -56,7 +56,21 @@ export default function Tareas() {
 
   const handleCrear = async () => {
     if (!form.titulo?.trim()) return alert('El título es obligatorio')
-    await crear({ ...form, completada: false })
+    const payload = {
+      titulo: form.titulo,
+      descripcion: form.descripcion || null,
+      fecha_vencimiento: form.fecha_vencimiento || null,
+      responsable: form.responsable || 'pablo',
+      cliente_id: form.cliente_id || null,
+      prioridad: form.prioridad || 'normal',
+      completada: false,
+    }
+    const { data, error } = await crear(payload)
+    if (error) {
+      console.error('Error creando tarea:', error)
+      alert('Error: ' + (error.message || JSON.stringify(error)))
+      return
+    }
     setForm({ titulo: '', descripcion: '', fecha_vencimiento: '', responsable: 'pablo', cliente_id: '', prioridad: 'normal' })
     setModalOpen(false)
   }
