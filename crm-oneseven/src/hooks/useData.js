@@ -381,3 +381,37 @@ export function useSubcontrataciones() {
   }
   return { subcontrataciones, loading, fetch, crear, actualizar, eliminar }
 }
+
+// ─── Desarrolladores (perfiles) ───────────────────────────────────────────────
+export function useDesarrolladores() {
+  const [desarrolladores, setDesarrolladores] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('desarrolladores').select('*').order('nombre', { ascending: true })
+    setDesarrolladores(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+
+  const crear = async (payload) => {
+    const { error } = await supabase.from('desarrolladores').insert([sanitize(payload)])
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  const actualizar = async (id, updates) => {
+    const { error } = await supabase.from('desarrolladores').update(sanitize(updates)).eq('id', id)
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  const eliminar = async (id) => {
+    const { error } = await supabase.from('desarrolladores').delete().eq('id', id)
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  return { desarrolladores, loading, fetch, crear, actualizar, eliminar }
+}
