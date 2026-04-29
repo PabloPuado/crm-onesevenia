@@ -725,10 +725,35 @@ export default function Subcontrataciones() {
                       {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
 
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer', marginBottom: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer', marginBottom: 8 }}>
                       <input type="checkbox" checked={s.contrato_firmado} onChange={async e => await actualizar(s.id, { contrato_firmado: e.target.checked })} style={{ accentColor: 'var(--accent)' }} />
                       <span style={{ color: 'var(--text1)' }}>Contrato firmado</span>
                     </label>
+                    {/* Subir contrato firmado */}
+                    <div style={{ marginBottom: 12 }}>
+                      {s.contrato_url ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'rgba(16,185,129,0.1)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)' }}>
+                          <span style={{ fontSize: 11, color: 'var(--green)', flex: 1 }}>Contrato subido</span>
+                          <a href={s.contrato_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--accent2)', textDecoration: 'none' }}>Ver</a>
+                          <button onClick={async () => await actualizar(s.id, { contrato_url: null, contrato_firmado: false })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 11, padding: 0 }}>x</button>
+                        </div>
+                      ) : (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 8, border: '1px dashed var(--border2)', cursor: 'pointer', fontSize: 11, color: 'var(--text3)' }}>
+                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 9V1M4 4l3-3 3 3"/><path d="M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/></svg>
+                          Subir contrato firmado (PDF/imagen)
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={async e => {
+                            const file = e.target.files[0]
+                            if (!file) return
+                            const { supabase } = await import('../lib/supabase')
+                            const path = `contratos/${s.id}_${Date.now()}_${file.name}`
+                            const { error: upErr } = await supabase.storage.from('documentos').upload(path, file)
+                            if (upErr) { alert('Error al subir: ' + upErr.message); return }
+                            const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
+                            await actualizar(s.id, { contrato_url: publicUrl, contrato_firmado: true })
+                          }} />
+                        </label>
+                      )}
+                    </div>
 
                     {totalHitos > 0 && (
                       <>
