@@ -16,6 +16,7 @@ function SeccionEmpresa() {
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   // Inicializar form cuando config carga
   if (config && form === null) {
@@ -129,8 +130,42 @@ function SeccionEmpresa() {
       <div className="card">
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>PDFs</div>
         <div className="form-group">
-          <label className="form-label">URL del logo <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>(se muestra en los PDFs)</span></label>
-          <input className="form-input" value={form.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="https://..." />
+          <label className="form-label">Logo de la empresa <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>— aparece en todos los PDFs generados</span></label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            {/* Preview */}
+            <div style={{ width: 80, height: 60, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--border2)', overflow: 'hidden' }}>
+              {form.logo_url ? (
+                <img src={form.logo_url} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
+              ) : (
+                <span style={{ fontSize: 10, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.4 }}>Sin logo</span>
+              )}
+            </div>
+            {/* Upload + URL */}
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)', cursor: uploading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 9V1M4 4l3-3 3 3"/><path d="M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/></svg>
+                {uploading ? 'Subiendo...' : 'Subir logo desde ordenador'}
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style={{ display: 'none' }} disabled={uploading} onChange={async e => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  setUploading(true)
+                  try {
+                    const { supabase } = await import('../lib/supabase')
+                    const ext = file.name.split('.').pop()
+                    const path = `logos/empresa_logo_${Date.now()}.${ext}`
+                    const { error: upErr } = await supabase.storage.from('documentos').upload(path, file, { upsert: true })
+                    if (upErr) { alert('Error al subir: ' + upErr.message); return }
+                    const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
+                    set('logo_url', publicUrl)
+                  } finally {
+                    setUploading(false)
+                  }
+                }} />
+              </label>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>PNG, JPG o SVG · Recomendado: fondo blanco o transparente</div>
+              <input className="form-input" value={form.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="O pega la URL directamente..." style={{ fontSize: 12 }} />
+            </div>
+          </div>
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label className="form-label">Nota al pie de los PDFs <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
