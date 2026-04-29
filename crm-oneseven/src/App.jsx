@@ -17,6 +17,7 @@ import Propuestas from './pages/Propuestas'
 import Presupuestos from './pages/Presupuestos'
 import Gastos from './pages/Gastos'
 import Subcontrataciones from './pages/Subcontrataciones'
+import Configuracion from './pages/Configuracion'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Route path="/presupuestos" element={<ProtectedRoute><Presupuestos /></ProtectedRoute>} />
       <Route path="/gastos" element={<ProtectedRoute><Gastos /></ProtectedRoute>} />
       <Route path="/subcontrataciones" element={<ProtectedRoute><Subcontrataciones /></ProtectedRoute>} />
+      <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="/ingresos" element={<ProtectedRoute><Ingresos /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
       <Route path="/contabilidad" element={<ProtectedRoute><Contabilidad /></ProtectedRoute>} />
