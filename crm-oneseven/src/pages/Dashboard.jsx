@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useClientes } from '../hooks/useData'
+import { useGastos, useClientes } from '../hooks/useData'
 import { useIngresos } from '../hooks/useData'
 import { useTareas } from '../hooks/useData'
 import { useAuth } from '../context/AuthContext'
@@ -9,8 +9,126 @@ import { formatDate } from '../lib/constants'
 
 const OBJETIVO_MENSUAL_ALBERTO = 8000
 
+
+// ─── Widget split de gastos ────────────────────────────────────────────────────
+function SplitGastosWidget({ gastos }) {
+  const activos = (gastos || []).filter(g => g.activo !== false)
+
+  // Calcular lo que debe pagar cada uno según % acordado (mensual)
+  const importeMensual = (g) => {
+    const imp = parseFloat(g.importe) || 0
+    switch (g.frecuencia) {
+      case 'mensual': return imp
+      case 'trimestral': return imp / 3
+      case 'semestral': return imp / 6
+      case 'anual': return imp / 12
+      default: return 0
+    }
+  }
+
+  // Lo que cada uno DEBERÍA pagar según su % acordado
+  let deberiaP = 0, deberiaA = 0
+  // Lo que cada uno HA PAGADO realmente
+  let pagadoP = 0, pagadoA = 0
+
+  activos.forEach(g => {
+    const mensual = importeMensual(g)
+    if (mensual <= 0) return
+    const pctP = parseFloat(g.pct_pablo) || 50
+    const pctA = parseFloat(g.pct_alberto) || 50
+
+    // Lo que deberían pagar
+    deberiaP += mensual * pctP / 100
+    deberiaA += mensual * pctA / 100
+
+    // Lo que han pagado realmente
+    if (g.pagado_por === 'pablo') { pagadoP += mensual }
+    else if (g.pagado_por === 'alberto') { pagadoA += mensual }
+    else { pagadoP += mensual * pctP / 100; pagadoA += mensual * pctA / 100 }
+  })
+
+  // Deuda: si Pablo pagó más de lo que le toca, Alberto le debe a Pablo
+  const totalPagado = pagadoP + pagadoA
+  const deudaP = deberiaP - pagadoP  // positivo = Pablo debe más de lo que pagó
+  const deudaA = deberiaA - pagadoA
+
+  // Si deudaP > 0: Pablo ha pagado menos de lo que le toca → Pablo le debe a Alberto
+  // Si deudaA > 0: Alberto ha pagado menos → Alberto le debe a Pablo
+  const fmt = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(Math.abs(n))
+
+  let deudorNombre = null, acreedorNombre = null, cantidadDeuda = 0
+  if (deudaA > 0.01) { deudorNombre = 'Alberto'; acreedorNombre = 'Pablo'; cantidadDeuda = deudaA }
+  else if (deudaP > 0.01) { deudorNombre = 'Pablo'; acreedorNombre = 'Alberto'; cantidadDeuda = Math.abs(deudaP) }
+
+  if (activos.length === 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 16 }}>
+        Reparto de gastos — Pablo vs Alberto
+      </div>
+
+      {/* Barras comparativas */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        {[
+          { nombre: 'Pablo', deberia: deberiaP, pagado: pagadoP, color: '#6366f1' },
+          { nombre: 'Alberto', deberia: deberiaA, pagado: pagadoA, color: '#06b6d4' },
+        ].map(p => {
+          const maxVal = Math.max(deberiaP, deberiaA, 1)
+          const diff = p.pagado - p.deberia
+          return (
+            <div key={p.nombre} style={{ padding: '12px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: `1px solid ${p.color}30` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: p.color }}>{p.nombre}</span>
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: diff >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: diff >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 500 }}>
+                  {diff >= 0 ? `+${fmt(diff)} a favor` : `${fmt(diff)} pendiente`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>
+                <span>Debería pagar/mes</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text1)' }}>{fmt(p.deberia)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>
+                <span>Ha pagado/mes</span>
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, color: p.color }}>{fmt(p.pagado)}</span>
+              </div>
+              {/* Barra progreso */}
+              <div style={{ height: 6, background: 'var(--bg4)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min((p.pagado / Math.max(p.deberia, 0.01)) * 100, 100)}%`, background: diff >= 0 ? 'var(--green)' : p.color, borderRadius: 3, transition: 'width 0.4s' }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Resultado: quién debe a quién */}
+      {deudorNombre ? (
+        <div style={{ padding: '14px 18px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>↕</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>
+                <span style={{ color: 'var(--red)' }}>{deudorNombre}</span> debe a <span style={{ color: 'var(--green)' }}>{acreedorNombre}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Diferencia acumulada en gastos del mes</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--red)' }}>
+            {fmt(cantidadDeuda)}
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '12px 18px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
+          Estais al dia — sin deudas entre vosotros
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { clientes } = useClientes()
+  const { gastos } = useGastos()
   const { ingresos } = useIngresos()
   const { tareas } = useTareas()
   const { getUserName } = useAuth()
@@ -164,6 +282,7 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+      <SplitGastosWidget gastos={gastos} />
     </Layout>
   )
 }
