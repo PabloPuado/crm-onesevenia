@@ -143,15 +143,17 @@ function ModalRegistrarPago({ gasto, onClose, onSave }) {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const [saving, setSaving] = useState(false)
 
-  // Respetar si está imputado o no
-  const imputadoP = gasto.imputar_pablo !== false
-  const imputadoA = gasto.imputar_alberto !== false
   const modoP = gasto.modo_pablo || 'pct'
   const modoA = gasto.modo_alberto || 'pct'
-  const pctP = imputadoP ? (parseFloat(gasto.pct_pablo) || 0) : 0
-  const pctA = imputadoA ? (parseFloat(gasto.pct_alberto) || 0) : 0
-  const fijoP = imputadoP ? (parseFloat(gasto.fijo_pablo) || 0) : 0
-  const fijoA = imputadoA ? (parseFloat(gasto.fijo_alberto) || 0) : 0
+  const pctP = parseFloat(gasto.pct_pablo) || 0
+  const pctA = parseFloat(gasto.pct_alberto) || 0
+  const fijoP = parseFloat(gasto.fijo_pablo) || 0
+  const fijoA = parseFloat(gasto.fijo_alberto) || 0
+  // Una persona está imputada si su parte > 0
+  const impP = modoP === 'fijo' ? fijoP : (parseFloat(gasto.importe)||0) * pctP / 100
+  const impA = modoA === 'fijo' ? fijoA : (parseFloat(gasto.importe)||0) * pctA / 100
+  const imputadoP = impP > 0.001
+  const imputadoA = impA > 0.001
   const imp = parseFloat(form.importe) || 0
 
   return (
@@ -274,10 +276,10 @@ function SplitEditor({ form, set }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {personas.map(p => {
-          const imputado = form[`imputar_${p.key}`] !== false
           const modo = form[`modo_${p.key}`] || 'pct'
           const pct = parseFloat(form[`pct_${p.key}`]) || 0
           const fijo = parseFloat(form[`fijo_${p.key}`]) || 0
+          const imputado = modo === 'fijo' ? fijo > 0 : pct > 0
           const importeCalculado = modo === 'fijo' ? fijo : imp * pct / 100
 
           return (
@@ -292,7 +294,19 @@ function SplitEditor({ form, set }) {
                 {/* Toggle imputar */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: imputado ? p.color : 'var(--text3)' }}>
                   <div
-                    onClick={() => set(`imputar_${p.key}`, !imputado)}
+                    onClick={() => {
+                      const nuevoImputado = !imputado
+                      set(`imputar_${p.key}`, nuevoImputado)
+                      if (!nuevoImputado) {
+                        set(`pct_${p.key}`, 0)
+                        set(`fijo_${p.key}`, 0)
+                      } else {
+                        // Restaurar 50% por defecto al activar
+                        const otro = p.key === 'pablo' ? 'alberto' : 'pablo'
+                        set(`pct_${p.key}`, 50)
+                        if (form[`modo_${otro}`] !== 'fijo') set(`pct_${otro}`, 50)
+                      }
+                    }}
                     style={{ width: 36, height: 20, borderRadius: 10, background: imputado ? p.color : 'var(--bg4)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}
                   >
                     <div style={{ position: 'absolute', top: 2, left: imputado ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
@@ -583,11 +597,8 @@ export default function Gastos() {
   const calcParte = (g, persona) => {
     const imp = importeMensual(g)
     if (imp <= 0) return 0
-    const imputado = g[`imputar_${persona}`] !== false
-    if (!imputado) return 0
     const modo = g[`modo_${persona}`] || 'pct'
     if (modo === 'fijo') {
-      // Fijo mensualizado
       const fijo = parseFloat(g[`fijo_${persona}`]) || 0
       const impTotal = parseFloat(g.importe) || 0
       return impTotal > 0 ? imp * (fijo / impTotal) : 0
