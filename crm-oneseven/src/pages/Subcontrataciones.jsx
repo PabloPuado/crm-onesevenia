@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useSubcontrataciones, useClientes, useEmpresaConfig } from '../hooks/useData'
+import { useSubcontrataciones, useClientes, useEmpresaConfig, useDesarrolladores } from '../hooks/useData'
 import { formatEur, formatDate } from '../lib/constants'
 
 // Icons
@@ -231,7 +231,7 @@ h1 { font-size: 20px; letter-spacing: .1em; text-transform: uppercase; margin-bo
 }
 
 // ─── Formulario ───────────────────────────────────────────────────────────────
-function FormularioSubcontratacion({ sub, clientes, onSave, onCancel }) {
+function FormularioSubcontratacion({ sub, clientes, desarrolladores, onSave, onCancel }) {
   const isEdit = !!sub?.id
   const [form, setForm] = useState({
     dev_nombre: '', dev_email: '', dev_telefono: '', dev_especialidad: 'Full Stack',
@@ -264,6 +264,29 @@ function FormularioSubcontratacion({ sub, clientes, onSave, onCancel }) {
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>
           Datos del desarrollador
         </div>
+        {/* Selector de perfil guardado */}
+        {desarrolladores.length > 0 && (
+          <div className="form-group">
+            <label className="form-label">Cargar perfil guardado <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>— rellena los datos automáticamente</span></label>
+            <select className="form-select" defaultValue="" onChange={e => {
+              const dev = desarrolladores.find(d => d.id === e.target.value)
+              if (!dev) return
+              set('dev_nombre', dev.nombre || '')
+              set('dev_email', dev.email || '')
+              set('dev_telefono', dev.telefono || '')
+              set('dev_especialidad', dev.especialidad || 'Full Stack')
+              set('dev_nif', dev.nif || '')
+              set('dev_iban', dev.iban || '')
+              set('dev_banco', dev.banco || '')
+            }}>
+              <option value="">Seleccionar perfil...</option>
+              {desarrolladores.filter(d => d.activo !== false).map(d => (
+                <option key={d.id} value={d.id}>{d.nombre}{d.especialidad ? ` · ${d.especialidad}` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 12px' }}>
           <div className="form-group"><label className="form-label">Nombre completo *</label><input className="form-input" value={form.dev_nombre} onChange={e => set('dev_nombre', e.target.value)} placeholder="Nombre del desarrollador" /></div>
           <div className="form-group"><label className="form-label">Especialidad</label>
@@ -499,6 +522,7 @@ export default function Subcontrataciones() {
   const { subcontrataciones, crear, actualizar, eliminar } = useSubcontrataciones()
   const { clientes } = useClientes()
   const { config: empresa } = useEmpresaConfig()
+  const { desarrolladores } = useDesarrolladores()
 
   const [vista, setVista] = useState('lista') // lista | form | dev
   const [editando, setEditando] = useState(null)
@@ -554,7 +578,7 @@ export default function Subcontrataciones() {
     return (
       <Layout title={editando?.id ? 'Editar subcontratacion' : 'Nueva subcontratacion'} subtitle="Datos del desarrollador y proyecto">
         <div style={{ maxWidth: 820 }}>
-          <FormularioSubcontratacion sub={editando} clientes={clientes} onSave={handleSave} onCancel={() => { setVista('lista'); setEditando(null) }} />
+          <FormularioSubcontratacion sub={editando} clientes={clientes} desarrolladores={desarrolladores} onSave={handleSave} onCancel={() => { setVista('lista'); setEditando(null) }} />
         </div>
       </Layout>
     )
