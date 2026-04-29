@@ -415,3 +415,53 @@ export function useDesarrolladores() {
   }
   return { desarrolladores, loading, fetch, crear, actualizar, eliminar }
 }
+
+// ─── Pagos de gastos ──────────────────────────────────────────────────────────
+export function usePagosGastos() {
+  const [pagos, setPagos] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('pagos_gastos').select('*, gastos(nombre, categoria, importe, pct_pablo, pct_alberto, frecuencia)').order('fecha', { ascending: false })
+    setPagos(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+
+  const registrar = async (payload) => {
+    const { error } = await supabase.from('pagos_gastos').insert([sanitize(payload)])
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  const eliminar = async (id) => {
+    const { error } = await supabase.from('pagos_gastos').delete().eq('id', id)
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  return { pagos, loading, fetch, registrar, eliminar }
+}
+
+// ─── Liquidaciones ────────────────────────────────────────────────────────────
+export function useLiquidaciones() {
+  const [liquidaciones, setLiquidaciones] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('liquidaciones').select('*').order('fecha', { ascending: false })
+    setLiquidaciones(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+
+  const crear = async (payload) => {
+    const { error } = await supabase.from('liquidaciones').insert([sanitize(payload)])
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+  return { liquidaciones, loading, fetch, crear }
+}
