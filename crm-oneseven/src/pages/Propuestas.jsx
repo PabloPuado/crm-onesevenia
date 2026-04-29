@@ -4,6 +4,14 @@ import { useClientes } from '../hooks/useData'
 import { usePropuestas } from '../hooks/useData'
 import { formatEur, formatDate } from '../lib/constants'
 
+// Sanitize payload — convert empty strings to null (prevents uuid errors in Supabase)
+function sanitize(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === '' || v === undefined ? null : v])
+  )
+}
+
+
 function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg> }
 function TrashIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h9M5 3V2h3v1M3 3l.5 8h6l.5-8"/></svg> }
 function EditIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 2l2 2-7 7H2V9L9 2z"/></svg> }
