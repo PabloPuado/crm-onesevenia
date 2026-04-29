@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
 import { useGastos, usePagosGastos, useLiquidaciones } from '../hooks/useData'
+import SplitGastosWidget from '../components/SplitGastosWidget'
 import { formatEur, formatDate } from '../lib/constants'
 
 const formatDec = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(n) || 0)
@@ -875,87 +876,7 @@ export default function Gastos() {
         ))}
       </div>
 
-      {/* Widget Pablo vs Alberto */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>Reparto Pablo vs Alberto</div>
-          {deudorNombre && (
-            <button className="btn btn-ghost btn-sm" onClick={() => setLiquidacionModal(true)} style={{ gap: 5, color: 'var(--green)' }}>
-              <CheckIcon /> Registrar liquidación
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          {[
-            { nombre: 'Pablo', pagado: totalPagadoP, deberia: deberiaP, color: '#6366f1' },
-            { nombre: 'Alberto', pagado: totalPagadoA, deberia: deberiaA, color: '#06b6d4' },
-          ].map(p => {
-            const diff = p.pagado - p.deberia
-            const pagos_persona = pagos.filter(pg => pg.pagado_por === p.nombre.toLowerCase())
-            return (
-              <div key={p.nombre} style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: `1px solid ${p.color}25` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: p.color }}>{p.nombre}</span>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: pagos.length === 0 ? 'var(--bg4)' : diff >= -0.01 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: pagos.length === 0 ? 'var(--text3)' : diff >= -0.01 ? 'var(--green)' : 'var(--red)' }}>
-                    {pagos.length === 0 ? 'Sin pagos' : diff >= -0.01 ? `+${formatDec(diff)} a favor` : `${formatDec(Math.abs(diff))} pendiente`}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {[
-                    { label: 'Pagado real (total)', value: formatDec(p.pagado), color: p.color, bold: true },
-                    { label: 'Debería pagar/mes', value: formatDec(p.deberia), color: 'var(--text2)' },
-                    { label: 'Nº pagos registrados', value: pagos_persona.length, color: 'var(--text3)' },
-                  ].map(r => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text3)' }}>{r.label}</span>
-                      <span style={{ fontFamily: 'var(--mono)', color: r.color, fontWeight: r.bold ? 700 : 400 }}>{r.value}</span>
-                    </div>
-                  ))}
-                </div>
-                {pagos.length > 0 && (
-                  <div style={{ marginTop: 8, height: 4, background: 'var(--bg4)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(p.deberia > 0 ? (p.pagado/p.deberia)*100 : 0, 100)}%`, background: diff >= 0 ? 'var(--green)' : p.color, borderRadius: 2, transition: 'width 0.4s' }} />
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Resultado deuda */}
-        {pagos.length > 0 && (
-          deudorNombre ? (
-            <div style={{ padding: '14px 18px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>
-                  <span style={{ color: 'var(--red)' }}>{deudorNombre}</span> debe a <span style={{ color: 'var(--green)' }}>{acreedorNombre}</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Basado en pagos registrados vs % acordados</div>
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--red)' }}>{formatDec(cantidadDeuda)}</div>
-            </div>
-          ) : (
-            <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
-              Estáis al día — sin deudas pendientes
-            </div>
-          )
-        )}
-
-        {/* Historial liquidaciones */}
-        {liquidaciones.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Liquidaciones registradas</div>
-            {liquidaciones.slice(0, 3).map(l => (
-              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text2)' }}>{formatDate(l.fecha)} · <span style={{ color: 'var(--red)' }}>{l.pagador}</span> → <span style={{ color: 'var(--green)' }}>{l.receptor}</span></span>
-                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--green)' }}>{formatDec(l.importe)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+      <SplitGastosWidget onLiquidacion={() => setLiquidacionModal(true)} />
       {/* Gráficos */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div className="card">
