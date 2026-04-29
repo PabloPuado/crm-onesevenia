@@ -1015,7 +1015,7 @@ export default function Gastos() {
               const mensual = importeMensual(g)
               const anual = importeAnual(g)
               const pagosGasto = pagos.filter(p => p.gasto_id === g.id)
-              const totalPagadoGasto = pagosGasto.reduce((s, p) => s + (parseFloat(p.importe)||0), 0)
+              const totalPagadoGasto = pagosGasto.filter(p => p.tipo !== 'reembolso').reduce((s, p) => s + (parseFloat(p.importe)||0), 0)
               const esMes = g.frecuencia === 'mensual'
               const yaConfirmadoMes = esMes && pagosGasto.some(p => p.periodo?.startsWith(`${ANO_ACTUAL}-${String(MES_ACTUAL).padStart(2,'0')}`))
               const isExpanded = expanded === g.id
