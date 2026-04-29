@@ -1,14 +1,7 @@
 import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useGastos } from '../hooks/useData'
-import { formatEur } from '../lib/constants'
-
-// Sanitize payload — convert empty strings to null (prevents uuid errors in Supabase)
-function sanitize(obj) {
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, v === '' || v === undefined ? null : v])
-  )
-}
+import { useGastos, usePagosGastos, useLiquidaciones } from '../hooks/useData'
+import { formatEur, formatDate } from '../lib/constants'
 
 const formatDec = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(n) || 0)
 
@@ -16,14 +9,17 @@ function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fil
 function EditIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 2l2 2-7 7H2V9L9 2z"/></svg> }
 function TrashIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h9M5 3V2h3v1M3 3l.5 8h6l.5-8"/></svg> }
 function CloseIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg> }
+function CheckIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6.5l4 4 5-6"/></svg> }
+function ChevronIcon({ open }) { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><path d="M3 5l4 4 4-4"/></svg> }
+function ShareIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 1l3 3-3 3M12 4H5a4 4 0 0 0 0 8h1"/></svg> }
 
 const CATEGORIAS = ['software', 'marketing', 'personal', 'oficina', 'servicios', 'infraestructura', 'formacion', 'legal', 'bancario', 'otros']
 const CAT_COLORS = { software: '#6366f1', marketing: '#ec4899', personal: '#f59e0b', oficina: '#10b981', servicios: '#3b82f6', infraestructura: '#8b5cf6', formacion: '#06b6d4', legal: '#ef4444', bancario: '#84cc16', otros: '#6b7280' }
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const ANO_ACTUAL = new Date().getFullYear()
 const MES_ACTUAL = new Date().getMonth() + 1
+const MES_LABEL = MESES[MES_ACTUAL - 1]
 
-// Calcula el importe mensual de un gasto según su frecuencia
 function importeMensual(g) {
   const imp = parseFloat(g.importe) || 0
   switch (g.frecuencia) {
@@ -31,11 +27,10 @@ function importeMensual(g) {
     case 'trimestral': return imp / 3
     case 'semestral': return imp / 6
     case 'anual': return imp / 12
-    case 'unico': return 0 // no recurrente
+    case 'unico': return 0
     default: return imp
   }
 }
-
 function importeAnual(g) {
   const imp = parseFloat(g.importe) || 0
   switch (g.frecuencia) {
@@ -48,27 +43,102 @@ function importeAnual(g) {
   }
 }
 
-// ─── Grafico de barras simple ─────────────────────────────────────────────────
-function BarChart({ data, maxVal, height = 160 }) {
-  if (!data || !maxVal) return null
+// ─── Modal registrar pago ─────────────────────────────────────────────────────
+function ModalRegistrarPago({ gasto, onClose, onSave }) {
+  const hoy = new Date().toISOString().split('T')[0]
+  const mesLabel = `${ANO_ACTUAL}-${String(MES_ACTUAL).padStart(2,'0')}`
+  const [form, setForm] = useState({
+    gasto_id: gasto.id,
+    pagado_por: gasto.pagado_por || 'pablo',
+    importe: String(parseFloat(gasto.importe) || ''),
+    fecha: hoy,
+    periodo: gasto.frecuencia === 'mensual' ? mesLabel : gasto.frecuencia === 'anual' ? String(ANO_ACTUAL) : mesLabel,
+    notas: '',
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const [saving, setSaving] = useState(false)
+
+  const pctP = parseFloat(gasto.pct_pablo) || 50
+  const pctA = parseFloat(gasto.pct_alberto) || 50
+  const imp = parseFloat(form.importe) || 0
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height, padding: '0 4px' }}>
-      {data.map((d, i) => {
-        const pct = maxVal > 0 ? (d.valor / maxVal) * 100 : 0
-        return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-            <div style={{ fontSize: 9, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.1 }}>
-              {d.valor > 0 ? formatEur(d.valor).replace('€','').trim() : ''}
-            </div>
-            <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: d.highlight ? 'var(--accent)' : 'var(--bg4)', height: `${Math.max(pct, d.valor > 0 ? 4 : 0)}%`, transition: 'height 0.3s', position: 'relative', minHeight: d.valor > 0 ? 4 : 0 }}>
-              {d.fijo !== undefined && d.fijo > 0 && (
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${d.valor > 0 ? (d.fijo/d.valor)*100 : 0}%`, background: '#6366f1', borderRadius: '4px 4px 0 0', minHeight: 2 }} />
-              )}
-            </div>
-            <div style={{ fontSize: 9, color: d.highlight ? 'var(--accent2)' : 'var(--text3)', fontWeight: d.highlight ? 600 : 400, textAlign: 'center' }}>{d.label}</div>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 460, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>Registrar pago</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{gasto.nombre}</div>
           </div>
-        )
-      })}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><CloseIcon /></button>
+        </div>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group">
+              <label className="form-label">Quién ha pagado</label>
+              <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)}>
+                <option value="pablo">Pablo</option>
+                <option value="alberto">Alberto</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Importe pagado (€)</label>
+              <input className="form-input" type="number" step="0.01" value={form.importe} onChange={e => set('importe', e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group">
+              <label className="form-label">Fecha del pago</label>
+              <input className="form-input" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Periodo <span style={{ fontSize: 10, color: 'var(--text3)' }}>(ej: 2026-04)</span></label>
+              <input className="form-input" value={form.periodo} onChange={e => set('periodo', e.target.value)} placeholder="2026-04" />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)' }}>(referencia, concepto...)</span></label>
+            <input className="form-input" value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Ref. bancaria, concepto..." />
+          </div>
+
+          {/* Desglose split */}
+          {imp > 0 && (
+            <div style={{ padding: '12px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Desglose según % acordado</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {[{ name: 'Pablo', pct: pctP }, { name: 'Alberto', pct: pctA }].map(p => (
+                  <div key={p.name} style={{ flex: 1, padding: '8px 10px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center', border: p.name.toLowerCase() === form.pagado_por ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name} ({p.pct}%)</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--mono)', color: p.name.toLowerCase() === form.pagado_por ? 'var(--green)' : 'var(--text0)' }}>
+                      {formatDec(imp * p.pct / 100)}
+                    </div>
+                    {p.name.toLowerCase() === form.pagado_por && (
+                      <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>ha pagado</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Cuánto le debe el otro */}
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>
+                {form.pagado_por === 'pablo'
+                  ? `Alberto deberá reembolsar a Pablo: ${formatDec(imp * pctA / 100)}`
+                  : `Pablo deberá reembolsar a Alberto: ${formatDec(imp * pctP / 100)}`}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn btn-primary" disabled={saving || !form.importe} onClick={async () => {
+              setSaving(true)
+              await onSave({ ...form, importe: parseFloat(form.importe) })
+              setSaving(false)
+            }}>
+              {saving ? 'Registrando...' : 'Confirmar pago'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -82,26 +152,25 @@ function ModalGasto({ gasto, onClose, onSave }) {
     ...gasto,
   })
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
-  const esPersonalizada = form.categoria === '__custom__'
+  const esPersonalizada = !CATEGORIAS.includes(form.categoria) && form.categoria !== 'software'
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 500, border: '1px solid var(--border)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 500, border: '1px solid var(--border)', overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg1)', zIndex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>{gasto?.id ? 'Editar gasto' : 'Nuevo gasto'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><CloseIcon /></button>
         </div>
         <div style={{ padding: '20px' }}>
           <div className="form-group">
-            <label className="form-label">Nombre del gasto *</label>
-            <input className="form-input" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Suscripcion n8n, Alquiler oficina..." autoFocus />
+            <label className="form-label">Nombre *</label>
+            <input className="form-input" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: n8n, Vercel, Alquiler..." autoFocus />
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div className="form-group">
-              <label className="form-label">Categoria</label>
-              <select className="form-select" value={esPersonalizada ? '__custom__' : form.categoria} onChange={e => {
-                if (e.target.value === '__custom__') { set('categoria', '__custom__') }
+              <label className="form-label">Categoría</label>
+              <select className="form-select" value={CATEGORIAS.includes(form.categoria) ? form.categoria : '__custom__'} onChange={e => {
+                if (e.target.value === '__custom__') set('categoria', form.categoria_custom || '')
                 else { set('categoria', e.target.value); set('categoria_custom', '') }
               }}>
                 {CATEGORIAS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
@@ -116,17 +185,15 @@ function ModalGasto({ gasto, onClose, onSave }) {
               </select>
             </div>
           </div>
-
-          {esPersonalizada && (
+          {(!CATEGORIAS.includes(form.categoria)) && (
             <div className="form-group">
-              <label className="form-label">Nombre de categoria personalizada *</label>
-              <input className="form-input" value={form.categoria_custom} onChange={e => set('categoria_custom', e.target.value)} placeholder="Ej: Subscripciones IA, Transporte..." />
+              <label className="form-label">Nombre categoría personalizada *</label>
+              <input className="form-input" value={form.categoria} onChange={e => set('categoria', e.target.value)} placeholder="Ej: IA Tools, Transporte..." />
             </div>
           )}
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div className="form-group">
-              <label className="form-label">Importe (EUR)</label>
+              <label className="form-label">Importe (€)</label>
               <input className="form-input" type="number" step="0.01" value={form.importe} onChange={e => set('importe', e.target.value)} placeholder="0.00" />
             </div>
             <div className="form-group">
@@ -136,25 +203,14 @@ function ModalGasto({ gasto, onClose, onSave }) {
                 <option value="trimestral">Trimestral</option>
                 <option value="semestral">Semestral</option>
                 <option value="anual">Anual</option>
-                <option value="unico">Pago unico</option>
+                <option value="unico">Pago único</option>
               </select>
             </div>
           </div>
-
           {form.frecuencia !== 'unico' && (
             <div className="form-group">
-              <label className="form-label">
-                Dia del mes en que se cobra
-                <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(opcional — ej: 1, 15, 28...)</span>
-              </label>
-              <input
-                className="form-input"
-                type="number"
-                min="1" max="31"
-                value={form.dia_cobro || ''}
-                onChange={e => set('dia_cobro', e.target.value ? parseInt(e.target.value) : null)}
-                placeholder="Ej: 1 para el primero de cada mes"
-              />
+              <label className="form-label">Día de cobro <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
+              <input className="form-input" type="number" min="1" max="31" value={form.dia_cobro || ''} onChange={e => set('dia_cobro', e.target.value ? parseInt(e.target.value) : null)} placeholder="Ej: 1, 15, 28..." />
             </div>
           )}
 
@@ -162,7 +218,7 @@ function ModalGasto({ gasto, onClose, onSave }) {
           <div style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Reparto del gasto</div>
             <div className="form-group">
-              <label className="form-label">Quién lo ha pagado</label>
+              <label className="form-label">Quién suele pagarlo</label>
               <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)}>
                 <option value="pablo">Pablo</option>
                 <option value="alberto">Alberto</option>
@@ -173,23 +229,21 @@ function ModalGasto({ gasto, onClose, onSave }) {
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">% Pablo</label>
                 <input className="form-input" type="number" min="0" max="100" value={form.pct_pablo}
-                  onChange={e => { const v = parseFloat(e.target.value)||0; set('pct_pablo', v); set('pct_alberto', Math.max(0, 100-v)) }}
-                />
+                  onChange={e => { const v = Math.min(100, Math.max(0, parseFloat(e.target.value)||0)); set('pct_pablo', v); set('pct_alberto', Math.round((100-v)*10)/10) }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">% Alberto</label>
                 <input className="form-input" type="number" min="0" max="100" value={form.pct_alberto}
-                  onChange={e => { const v = parseFloat(e.target.value)||0; set('pct_alberto', v); set('pct_pablo', Math.max(0, 100-v)) }}
-                />
+                  onChange={e => { const v = Math.min(100, Math.max(0, parseFloat(e.target.value)||0)); set('pct_alberto', v); set('pct_pablo', Math.round((100-v)*10)/10) }} />
               </div>
             </div>
             {form.importe && parseFloat(form.importe) > 0 && (
-              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                {[{name:'Pablo', pct: form.pct_pablo}, {name:'Alberto', pct: form.pct_alberto}].map(p => (
-                  <div key={p.name} style={{ flex: 1, padding: '8px 12px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name} ({p.pct}%)</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                {[{ name: 'Pablo', pct: form.pct_pablo }, { name: 'Alberto', pct: form.pct_alberto }].map(p => (
+                  <div key={p.name} style={{ flex: 1, padding: '8px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.name} ({p.pct}%)</div>
                     <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>
-                      {formatDec((parseFloat(form.importe)||0) * (parseFloat(p.pct)||0) / 100)}
+                      {formatDec((parseFloat(form.importe)||0) * p.pct / 100)}
                     </div>
                   </div>
                 ))}
@@ -198,30 +252,17 @@ function ModalGasto({ gasto, onClose, onSave }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
+            <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
             <input className="form-input" value={form.notas || ''} onChange={e => set('notas', e.target.value)} placeholder="Detalles adicionales..." />
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
             <input type="checkbox" id="activo" checked={form.activo} onChange={e => set('activo', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
-            <label htmlFor="activo" style={{ fontSize: 13, color: 'var(--text1)', cursor: 'pointer' }}>Gasto activo (incluir en calculos)</label>
+            <label htmlFor="activo" style={{ fontSize: 13, color: 'var(--text1)', cursor: 'pointer' }}>Gasto activo</label>
           </div>
-
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button className="btn btn-primary" onClick={() => {
-              if (!form.nombre || !form.importe) return alert('Rellena nombre e importe')
-              if (esPersonalizada && !form.categoria_custom) return alert('Escribe el nombre de la categoria personalizada')
-              const payload = {
-                ...form,
-                categoria: esPersonalizada ? form.categoria_custom : form.categoria,
-                categoria_custom: esPersonalizada ? form.categoria_custom : '',
-                importe: parseFloat(form.importe),
-                dia_cobro: form.dia_cobro ? parseInt(form.dia_cobro) : null,
-              }
-              onSave(payload)
-            }}>
-              {gasto?.id ? 'Guardar cambios' : 'Anadir gasto'}
+            <button className="btn btn-primary" onClick={() => form.nombre && form.importe ? onSave(form) : alert('Rellena nombre e importe')}>
+              {gasto?.id ? 'Guardar cambios' : 'Añadir gasto'}
             </button>
           </div>
         </div>
@@ -230,49 +271,146 @@ function ModalGasto({ gasto, onClose, onSave }) {
   )
 }
 
-// ─── Pagina principal ─────────────────────────────────────────────────────────
+// ─── Barra chart simple ───────────────────────────────────────────────────────
+function BarChart({ data, maxVal, height = 140 }) {
+  if (!data || !maxVal) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height, padding: '0 4px' }}>
+      {data.map((d, i) => {
+        const pct = maxVal > 0 ? (d.valor / maxVal) * 100 : 0
+        return (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+            <div style={{ fontSize: 9, color: 'var(--text3)' }}>{d.valor > 0 ? formatDec(d.valor).replace('€','').trim() : ''}</div>
+            <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: d.highlight ? 'var(--accent)' : 'var(--bg4)', height: `${Math.max(pct, d.valor > 0 ? 4 : 0)}%`, minHeight: d.valor > 0 ? 4 : 0 }} />
+            <div style={{ fontSize: 9, color: d.highlight ? 'var(--accent2)' : 'var(--text3)', fontWeight: d.highlight ? 600 : 400 }}>{d.label}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Modal liquidación ────────────────────────────────────────────────────────
+function ModalLiquidacion({ deudor, acreedor, importe, onClose, onConfirm }) {
+  const [form, setForm] = useState({
+    pagador: deudor, receptor: acreedor,
+    importe: importe.toFixed(2),
+    fecha: new Date().toISOString().split('T')[0],
+    notas: ''
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 420, border: '1px solid var(--border)', padding: 24 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)', marginBottom: 6 }}>Registrar liquidación</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>
+          <span style={{ color: 'var(--red)', fontWeight: 600 }}>{deudor}</span> paga a <span style={{ color: 'var(--green)', fontWeight: 600 }}>{acreedor}</span> para saldar la deuda
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+          <div className="form-group">
+            <label className="form-label">Importe liquidado (€)</label>
+            <input className="form-input" type="number" step="0.01" value={form.importe} onChange={e => set('importe', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Fecha</label>
+            <input className="form-input" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+          </div>
+        </div>
+        <div className="form-group" style={{ marginBottom: 20 }}>
+          <label className="form-label">Notas</label>
+          <input className="form-input" value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Transferencia, Bizum..." />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={() => onConfirm({ ...form, importe: parseFloat(form.importe) })}>
+            Confirmar liquidación
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 export default function Gastos() {
   const { gastos, crear, actualizar, eliminar } = useGastos()
-  const [modal, setModal] = useState(null) // null | {} | {id,...}
-  const [vistaGrafico, setVistaGrafico] = useState('mensual') // mensual | anual
+  const { pagos, registrar: registrarPago, eliminar: eliminarPago } = usePagosGastos()
+  const { liquidaciones, crear: crearLiquidacion } = useLiquidaciones()
+  const [modal, setModal] = useState(null)
+  const [pagoModal, setPagoModal] = useState(null)
+  const [liquidacionModal, setLiquidacionModal] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroCat, setFiltroCat] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [expanded, setExpanded] = useState(null)
+  const [verHistorial, setVerHistorial] = useState(null)
 
   const activos = gastos.filter(g => g.activo !== false)
 
+  // ── Cálculos KPI ────────────────────────────────────────────────────────────
   const totalMensual = activos.reduce((s, g) => s + importeMensual(g), 0)
   const totalAnual = activos.reduce((s, g) => s + importeAnual(g), 0)
   const totalFijo = activos.filter(g => g.tipo === 'fijo').reduce((s, g) => s + importeMensual(g), 0)
   const totalVariable = activos.filter(g => g.tipo === 'variable').reduce((s, g) => s + importeMensual(g), 0)
 
-  // Datos para grafico mensual (12 meses del ano actual)
-  const dataMensual = MESES.map((label, i) => {
-    const mes = i + 1
-    const fijo = activos.filter(g => g.tipo === 'fijo').reduce((s, g) => {
-      if (g.frecuencia === 'mensual') return s + parseFloat(g.importe)
-      if (g.frecuencia === 'trimestral' && mes % 3 === 1) return s + parseFloat(g.importe)
-      if (g.frecuencia === 'semestral' && (mes === 1 || mes === 7)) return s + parseFloat(g.importe)
-      if (g.frecuencia === 'anual' && mes === 1) return s + parseFloat(g.importe)
-      return s
-    }, 0)
-    const variable = activos.filter(g => g.tipo === 'variable').reduce((s, g) => {
-      if (g.frecuencia === 'mensual') return s + parseFloat(g.importe)
-      return s
-    }, 0)
-    return { label, valor: fijo + variable, fijo, highlight: mes === MES_ACTUAL }
+  // Total pagado por cada uno (pagos registrados reales)
+  const totalPagadoP = pagos.filter(p => p.pagado_por === 'pablo').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
+  const totalPagadoA = pagos.filter(p => p.pagado_por === 'alberto').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
+
+  // Lo que debería pagar cada uno según % (mensual)
+  const deberiaP = activos.reduce((s, g) => s + importeMensual(g) * (parseFloat(g.pct_pablo) || 50) / 100, 0)
+  const deberiaA = activos.reduce((s, g) => s + importeMensual(g) * (parseFloat(g.pct_alberto) || 50) / 100, 0)
+
+  // Total liquidaciones
+  const totalLiqP = liquidaciones.filter(l => l.pagador === 'pablo').reduce((s, l) => s + (parseFloat(l.importe)||0), 0)
+  const totalLiqA = liquidaciones.filter(l => l.pagador === 'alberto').reduce((s, l) => s + (parseFloat(l.importe)||0), 0)
+
+  // Deuda neta: pagado - debería pagar + liquidaciones recibidas - liquidaciones pagadas
+  const saldoP = totalPagadoP - deberiaP * (pagos.length > 0 ? 1 : 0) + totalLiqA - totalLiqP
+  const saldoA = totalPagadoA - deberiaA * (pagos.length > 0 ? 1 : 0) + totalLiqP - totalLiqA
+
+  // Deuda simple: quien pagó más de lo que le tocaba
+  let deudorNombre = null, acreedorNombre = null, cantidadDeuda = 0
+  if (pagos.length > 0) {
+    const diffP = totalPagadoP - (totalPagadoP + totalPagadoA) * (activos.reduce((s,g) => s + (parseFloat(g.pct_pablo)||50)/100 * importeMensual(g), 0) / Math.max(totalMensual, 0.01))
+    const diffA = totalPagadoA - (totalPagadoP + totalPagadoA) * (activos.reduce((s,g) => s + (parseFloat(g.pct_alberto)||50)/100 * importeMensual(g), 0) / Math.max(totalMensual, 0.01))
+    if (diffA < -0.01) { deudorNombre = 'Alberto'; acreedorNombre = 'Pablo'; cantidadDeuda = Math.abs(diffA) }
+    else if (diffP < -0.01) { deudorNombre = 'Pablo'; acreedorNombre = 'Alberto'; cantidadDeuda = Math.abs(diffP) }
+  }
+
+  // Gastos del mes pendientes de confirmar pago
+  const pendientesMes = activos.filter(g => {
+    if (g.frecuencia !== 'mensual') return false
+    const yaRegistrado = pagos.some(p => p.gasto_id === g.id && p.periodo?.startsWith(`${ANO_ACTUAL}-${String(MES_ACTUAL).padStart(2,'0')}`))
+    return !yaRegistrado
   })
 
-  // Datos para grafico anual (por categoria)
-  const porCategoria = CATEGORIAS.map(cat => {
-    const total = activos.filter(g => g.categoria === cat).reduce((s, g) => s + importeAnual(g), 0)
-    return { label: cat.slice(0, 3).toUpperCase(), valor: total, color: CAT_COLORS[cat] }
-  }).filter(d => d.valor > 0).sort((a, b) => b.valor - a.valor)
-
+  // Gráfico mensual
+  const dataMensual = MESES.map((label, i) => ({
+    label,
+    valor: activos.filter(g => g.tipo === 'fijo').reduce((s, g) => {
+      const m = i + 1
+      if (g.frecuencia === 'mensual') return s + parseFloat(g.importe)
+      if (g.frecuencia === 'trimestral' && m % 3 === 1) return s + parseFloat(g.importe)
+      if (g.frecuencia === 'semestral' && (m === 1 || m === 7)) return s + parseFloat(g.importe)
+      if (g.frecuencia === 'anual' && m === 1) return s + parseFloat(g.importe)
+      return s
+    }, 0) + activos.filter(g => g.tipo === 'variable').reduce((s, g) => g.frecuencia === 'mensual' ? s + parseFloat(g.importe) : s, 0),
+    highlight: i + 1 === MES_ACTUAL
+  }))
   const maxMensual = Math.max(...dataMensual.map(d => d.valor), 1)
+
+  // Por categoría
+  const allCats = [...new Set(activos.map(g => g.categoria))]
+  const porCategoria = allCats.map(cat => ({
+    label: cat?.slice(0, 4).toUpperCase() || 'OTRO',
+    fullLabel: cat,
+    valor: activos.filter(g => g.categoria === cat).reduce((s, g) => s + importeAnual(g), 0),
+    color: CAT_COLORS[cat] || '#6b7280'
+  })).filter(d => d.valor > 0).sort((a, b) => b.valor - a.valor)
   const maxCat = Math.max(...porCategoria.map(d => d.valor), 1)
 
-  // Lista filtrada
   const gastosFiltrados = useMemo(() => {
     let lista = [...gastos]
     if (filtroTipo !== 'todos') lista = lista.filter(g => g.tipo === filtroTipo)
@@ -286,17 +424,46 @@ export default function Gastos() {
     setModal(null)
   }
 
+  // Resumen para compartir por WA
+  const generarResumenWA = () => {
+    const lines = [
+      `*Resumen gastos ${MES_LABEL} ${ANO_ACTUAL}*`,
+      ``,
+      `Total mensual: ${formatDec(totalMensual)}`,
+      `Pablo pagado: ${formatDec(totalPagadoP)} | Debería: ${formatDec(deberiaP)}`,
+      `Alberto pagado: ${formatDec(totalPagadoA)} | Debería: ${formatDec(deberiaA)}`,
+      ``,
+      deudorNombre ? `*${deudorNombre} debe a ${acreedorNombre}: ${formatDec(cantidadDeuda)}*` : `*Sin deudas pendientes*`,
+      ``,
+      `Pagos sin confirmar este mes: ${pendientesMes.length}`,
+    ]
+    navigator.clipboard.writeText(lines.join('\n'))
+    alert('Resumen copiado al portapapeles')
+  }
+
   return (
-    <Layout title="Gastos empresa" subtitle="Control de costes fijos y variables" actions={
-      <button className="btn btn-primary" onClick={() => setModal({})}><PlusIcon /> Nuevo gasto</button>
+    <Layout title="Gastos empresa" subtitle="Control de costes y reparto" actions={
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-ghost btn-sm" onClick={generarResumenWA} style={{ gap: 5 }}><ShareIcon /> Resumen</button>
+        <button className="btn btn-primary" onClick={() => setModal({})}><PlusIcon /> Nuevo gasto</button>
+      </div>
     }>
-      {/* KPIs principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+
+      {/* Alerta pendientes del mes */}
+      {pendientesMes.length > 0 && (
+        <div style={{ padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 'var(--radius)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--amber)' }}>⚠ {pendientesMes.length} gasto{pendientesMes.length > 1 ? 's' : ''} mensual{pendientesMes.length > 1 ? 'es' : ''} sin confirmar pago en {MES_LABEL}</span>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>{pendientesMes.map(g => g.nombre).join(', ')}</span>
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Coste mensual total', value: formatDec(totalMensual), sub: 'gastos activos', color: 'var(--accent2)', big: true },
-          { label: 'Coste anual total', value: formatDec(totalAnual), sub: 'proyeccion', color: 'var(--text0)' },
-          { label: 'Costes fijos / mes', value: formatDec(totalFijo), sub: `${totalMensual > 0 ? Math.round(totalFijo/totalMensual*100) : 0}% del total`, color: '#6366f1' },
-          { label: 'Costes variables / mes', value: formatDec(totalVariable), sub: `${totalMensual > 0 ? Math.round(totalVariable/totalMensual*100) : 0}% del total`, color: 'var(--amber)' },
+          { label: 'Coste mensual', value: formatDec(totalMensual), sub: 'todos los gastos activos', color: 'var(--accent2)', big: true },
+          { label: 'Coste anual', value: formatDec(totalAnual), sub: 'proyección anual', color: 'var(--text0)' },
+          { label: 'Fijos / mes', value: formatDec(totalFijo), sub: `${totalMensual > 0 ? Math.round(totalFijo/totalMensual*100) : 0}% del total`, color: '#6366f1' },
+          { label: 'Variables / mes', value: formatDec(totalVariable), sub: `${totalMensual > 0 ? Math.round(totalVariable/totalMensual*100) : 0}% del total`, color: 'var(--amber)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: '14px 16px' }}>
             <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.label}</div>
@@ -306,48 +473,109 @@ export default function Gastos() {
         ))}
       </div>
 
-      {/* Graficos */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-        {/* Grafico mensual */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>Gastos por mes — {ANO_ACTUAL}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Morado = fijo · Gris = variable</div>
-            </div>
-          </div>
-          <BarChart data={dataMensual} maxVal={maxMensual} height={140} />
-          <div style={{ display: 'flex', gap: 16, marginTop: 12, justifyContent: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text3)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: '#6366f1' }} /> Fijo
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text3)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--bg4)' }} /> Variable
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--accent2)' }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)' }} /> Mes actual
-            </div>
-          </div>
+      {/* Widget Pablo vs Alberto */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>Reparto Pablo vs Alberto</div>
+          {deudorNombre && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setLiquidacionModal(true)} style={{ gap: 5, color: 'var(--green)' }}>
+              <CheckIcon /> Registrar liquidación
+            </button>
+          )}
         </div>
 
-        {/* Grafico por categoria */}
-        <div className="card">
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>Distribucion anual por categoria</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Total proyectado {ANO_ACTUAL}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          {[
+            { nombre: 'Pablo', pagado: totalPagadoP, deberia: deberiaP, color: '#6366f1' },
+            { nombre: 'Alberto', pagado: totalPagadoA, deberia: deberiaA, color: '#06b6d4' },
+          ].map(p => {
+            const diff = p.pagado - p.deberia
+            const pagos_persona = pagos.filter(pg => pg.pagado_por === p.nombre.toLowerCase())
+            return (
+              <div key={p.nombre} style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: `1px solid ${p.color}25` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: p.color }}>{p.nombre}</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: pagos.length === 0 ? 'var(--bg4)' : diff >= -0.01 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: pagos.length === 0 ? 'var(--text3)' : diff >= -0.01 ? 'var(--green)' : 'var(--red)' }}>
+                    {pagos.length === 0 ? 'Sin pagos' : diff >= -0.01 ? `+${formatDec(diff)} a favor` : `${formatDec(Math.abs(diff))} pendiente`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {[
+                    { label: 'Pagado real (total)', value: formatDec(p.pagado), color: p.color, bold: true },
+                    { label: 'Debería pagar/mes', value: formatDec(p.deberia), color: 'var(--text2)' },
+                    { label: 'Nº pagos registrados', value: pagos_persona.length, color: 'var(--text3)' },
+                  ].map(r => (
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text3)' }}>{r.label}</span>
+                      <span style={{ fontFamily: 'var(--mono)', color: r.color, fontWeight: r.bold ? 700 : 400 }}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+                {pagos.length > 0 && (
+                  <div style={{ marginTop: 8, height: 4, background: 'var(--bg4)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(p.deberia > 0 ? (p.pagado/p.deberia)*100 : 0, 100)}%`, background: diff >= 0 ? 'var(--green)' : p.color, borderRadius: 2, transition: 'width 0.4s' }} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Resultado deuda */}
+        {pagos.length > 0 && (
+          deudorNombre ? (
+            <div style={{ padding: '14px 18px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>
+                  <span style={{ color: 'var(--red)' }}>{deudorNombre}</span> debe a <span style={{ color: 'var(--green)' }}>{acreedorNombre}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Basado en pagos registrados vs % acordados</div>
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--red)' }}>{formatDec(cantidadDeuda)}</div>
+            </div>
+          ) : (
+            <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
+              Estáis al día — sin deudas pendientes
+            </div>
+          )
+        )}
+
+        {/* Historial liquidaciones */}
+        {liquidaciones.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Liquidaciones registradas</div>
+            {liquidaciones.slice(0, 3).map(l => (
+              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text2)' }}>{formatDate(l.fecha)} · <span style={{ color: 'var(--red)' }}>{l.pagador}</span> → <span style={{ color: 'var(--green)' }}>{l.receptor}</span></span>
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--green)' }}>{formatDec(l.importe)}</span>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Gráficos */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)', marginBottom: 4 }}>Gastos por mes — {ANO_ACTUAL}</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 14 }}>Mes actual destacado</div>
+          <BarChart data={dataMensual} maxVal={maxMensual} height={130} />
+        </div>
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)', marginBottom: 4 }}>Por categoría (anual)</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 14 }}>Proyección {ANO_ACTUAL}</div>
           {porCategoria.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 13, padding: '30px 0' }}>Sin datos todavia</div>
+            <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 13, padding: '30px 0' }}>Sin datos</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {porCategoria.slice(0, 6).map(d => (
-                <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[gastos.find(g => g.categoria?.slice(0,3).toUpperCase() === d.label)?.categoria] || '#6b7280', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: 'var(--text2)', width: 90, textTransform: 'capitalize' }}>{d.label}</span>
+                <div key={d.fullLabel} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: 'var(--text2)', width: 90, textTransform: 'capitalize' }}>{d.fullLabel}</span>
                   <div style={{ flex: 1, height: 6, background: 'var(--bg4)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${(d.valor / maxCat) * 100}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width 0.4s' }} />
+                    <div style={{ height: '100%', width: `${(d.valor / maxCat) * 100}%`, background: d.color, borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text1)', width: 80, textAlign: 'right' }}>{formatEur(d.valor)}</span>
+                  <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text1)', width: 80, textAlign: 'right' }}>{formatDec(d.valor)}</span>
                 </div>
               ))}
             </div>
@@ -355,13 +583,11 @@ export default function Gastos() {
         </div>
       </div>
 
-      {/* Lista de gastos */}
+      {/* Lista gastos */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Header lista */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>Todos los gastos ({gastos.length})</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {/* Filtro tipo */}
             <div style={{ display: 'flex', gap: 4 }}>
               {['todos', 'fijo', 'variable'].map(t => (
                 <button key={t} onClick={() => setFiltroTipo(t)} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: `1px solid ${filtroTipo === t ? 'var(--accent)' : 'var(--border2)'}`, background: filtroTipo === t ? 'var(--accent-dim)' : 'none', color: filtroTipo === t ? 'var(--accent2)' : 'var(--text3)', fontWeight: filtroTipo === t ? 600 : 400 }}>
@@ -369,16 +595,16 @@ export default function Gastos() {
                 </button>
               ))}
             </div>
-            <select className="form-select" style={{ height: 28, fontSize: 11, padding: '0 8px', width: 130 }} value={filtroCat} onChange={e => setFiltroCat(e.target.value)}>
-              <option value="">Todas las categorias</option>
-              {CATEGORIAS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+            <select className="form-select" style={{ height: 28, fontSize: 11, padding: '0 8px', width: 140 }} value={filtroCat} onChange={e => setFiltroCat(e.target.value)}>
+              <option value="">Todas las categorías</option>
+              {[...new Set(gastos.map(g => g.categoria))].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
         {gastosFiltrados.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
-            {gastos.length === 0 ? 'Anadir tu primer gasto para empezar' : 'No hay gastos con estos filtros'}
+            {gastos.length === 0 ? 'Añade tu primer gasto' : 'Sin gastos con estos filtros'}
           </div>
         ) : (
           <div>
@@ -386,72 +612,138 @@ export default function Gastos() {
               const catColor = CAT_COLORS[g.categoria] || '#6b7280'
               const mensual = importeMensual(g)
               const anual = importeAnual(g)
+              const pagosGasto = pagos.filter(p => p.gasto_id === g.id)
+              const totalPagadoGasto = pagosGasto.reduce((s, p) => s + (parseFloat(p.importe)||0), 0)
+              const esMes = g.frecuencia === 'mensual'
+              const yaConfirmadoMes = esMes && pagosGasto.some(p => p.periodo?.startsWith(`${ANO_ACTUAL}-${String(MES_ACTUAL).padStart(2,'0')}`))
+              const isExpanded = expanded === g.id
+
               return (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: i < gastosFiltrados.length - 1 ? '1px solid var(--border)' : 'none', opacity: g.activo === false ? 0.5 : 1 }}>
-                  {/* Indicador categoria */}
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: catColor + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: catColor }} />
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>{g.nombre}</span>
-                      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: g.tipo === 'fijo' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)', color: g.tipo === 'fijo' ? '#6366f1' : 'var(--amber)', fontWeight: 500 }}>
-                        {g.tipo === 'fijo' ? 'Fijo' : 'Variable'}
-                      </span>
-                      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'var(--bg4)', color: 'var(--text3)' }}>
-                        {g.categoria}
-                      </span>
-                      {g.activo === false && <span style={{ fontSize: 10, color: 'var(--red)' }}>Inactivo</span>}
+                <div key={g.id} style={{ borderBottom: i < gastosFiltrados.length - 1 ? '1px solid var(--border)' : 'none', opacity: g.activo === false ? 0.5 : 1 }}>
+                  {/* Fila principal */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: catColor + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: catColor }} />
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                      {formatEur(parseFloat(g.importe))} {g.frecuencia === 'mensual' ? '/mes' : g.frecuencia === 'trimestral' ? '/trimestre' : g.frecuencia === 'semestral' ? '/semestre' : g.frecuencia === 'anual' ? '/ano' : '(pago unico)'}
-                      {g.dia_cobro ? ` · cobra el dia ${g.dia_cobro}` : ''}
-                      {g.pagado_por ? ` · paga ${g.pagado_por === 'ambos' ? 'ambos' : g.pagado_por} (P:${g.pct_pablo||50}% A:${g.pct_alberto||50}%)` : ''}
-                      {g.notas ? ` · ${g.notas}` : ''}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text0)' }}>{g.nombre}</span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: g.tipo === 'fijo' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)', color: g.tipo === 'fijo' ? '#6366f1' : 'var(--amber)', fontWeight: 500 }}>
+                          {g.tipo === 'fijo' ? 'Fijo' : 'Variable'}
+                        </span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'var(--bg4)', color: 'var(--text3)' }}>{g.categoria}</span>
+                        {esMes && (
+                          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: yaConfirmadoMes ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: yaConfirmadoMes ? 'var(--green)' : 'var(--amber)', fontWeight: 500 }}>
+                            {yaConfirmadoMes ? '✓ ' + MES_LABEL : '⏳ ' + MES_LABEL}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                        {formatDec(parseFloat(g.importe))} {g.frecuencia === 'mensual' ? '/mes' : g.frecuencia === 'trimestral' ? '/trimestre' : g.frecuencia === 'semestral' ? '/semestre' : g.frecuencia === 'anual' ? '/año' : '(único)'}
+                        {g.dia_cobro ? ` · día ${g.dia_cobro}` : ''}
+                        {` · P:${g.pct_pablo||50}% A:${g.pct_alberto||50}%`}
+                        {pagosGasto.length > 0 ? ` · ${pagosGasto.length} pago${pagosGasto.length > 1 ? 's' : ''} (${formatDec(totalPagadoGasto)})` : ''}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {mensual > 0 && <div style={{ textAlign: 'right', marginRight: 4 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>{formatDec(mensual)}<span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'inherit', fontWeight: 400 }}>/mes</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{formatDec(anual)}/año</div>
+                      </div>}
+                      <button className="btn btn-ghost btn-sm" onClick={() => setPagoModal(g)} style={{ fontSize: 11, gap: 4, color: 'var(--green)', borderColor: 'rgba(16,185,129,0.3)' }} title="Registrar pago">
+                        <CheckIcon /> Pago
+                      </button>
+                      <button className="btn-icon" style={{ width: 28, height: 28, color: 'var(--text3)' }} onClick={() => setModal(g)}><EditIcon /></button>
+                      <button className="btn-icon" style={{ width: 28, height: 28, color: 'var(--red)' }} onClick={() => setConfirmDelete(g)}><TrashIcon /></button>
+                      <button className="btn-icon" style={{ width: 28, height: 28, color: 'var(--text3)' }} onClick={() => setExpanded(isExpanded ? null : g.id)}><ChevronIcon open={isExpanded} /></button>
                     </div>
                   </div>
 
-                  {/* Importes */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {mensual > 0 && <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>{formatDec(mensual)}<span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'inherit', fontWeight: 400 }}>/mes</span></div>}
-                    <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{formatDec(anual)}/ano</div>
-                  </div>
-
-                  {/* Acciones */}
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button className="btn-icon" style={{ width: 28, height: 28, color: 'var(--text3)' }} onClick={() => setModal(g)}><EditIcon /></button>
-                    <button className="btn-icon" style={{ width: 28, height: 28, color: 'var(--red)' }} onClick={() => setConfirmDelete(g)}><TrashIcon /></button>
-                  </div>
+                  {/* Historial de pagos expandible */}
+                  {isExpanded && (
+                    <div style={{ padding: '0 18px 14px 66px', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+                        Historial de pagos ({pagosGasto.length})
+                        {pagosGasto.length > 0 && <span style={{ fontFamily: 'var(--mono)', color: 'var(--text1)', marginLeft: 10, textTransform: 'none', fontWeight: 400 }}>Total: {formatDec(totalPagadoGasto)}</span>}
+                      </div>
+                      {pagosGasto.length === 0 ? (
+                        <div style={{ fontSize: 13, color: 'var(--text3)', fontStyle: 'italic' }}>Sin pagos registrados aún</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {pagosGasto.map(p => (
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8 }}>
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.pagado_por === 'pablo' ? 'rgba(99,102,241,0.15)' : 'rgba(6,182,212,0.15)', color: p.pagado_por === 'pablo' ? '#6366f1' : '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                {p.pagado_por === 'pablo' ? 'P' : 'A'}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text0)' }}>
+                                  {p.pagado_por === 'pablo' ? 'Pablo' : 'Alberto'} · {formatDate(p.fecha)}
+                                  {p.periodo && <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>Periodo: {p.periodo}</span>}
+                                </div>
+                                {p.notas && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.notas}</div>}
+                              </div>
+                              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--green)' }}>{formatDec(p.importe)}</span>
+                              <button className="btn-icon" style={{ width: 24, height: 24, color: 'var(--red)' }} onClick={() => eliminarPago(p.id)} title="Eliminar registro"><TrashIcon /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Split esperado */}
+                      <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                        {[{ name: 'Pablo', pct: g.pct_pablo||50 }, { name: 'Alberto', pct: g.pct_alberto||50 }].map(p => {
+                          const pagadoPers = pagosGasto.filter(pg => pg.pagado_por === p.name.toLowerCase()).reduce((s, pg) => s + (parseFloat(pg.importe)||0), 0)
+                          const deberiaTotal = totalPagadoGasto * p.pct / 100
+                          const diff = pagadoPers - deberiaTotal
+                          return (
+                            <div key={p.name} style={{ flex: 1, padding: '8px 10px', background: 'var(--bg2)', borderRadius: 8, textAlign: 'center' }}>
+                              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name} ({p.pct}%)</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--mono)', color: Math.abs(diff) < 0.01 ? 'var(--green)' : diff > 0 ? 'var(--green)' : 'var(--red)' }}>
+                                {formatDec(pagadoPers)} pagado
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--text3)' }}>Debería: {formatDec(deberiaTotal)}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
 
-            {/* Total lista */}
+            {/* Totales filtrados */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 18px', borderTop: '2px solid var(--border)', gap: 24 }}>
               <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                Total filtrado: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeMensual(g),0))}/mes</strong>
+                Filtrado/mes: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeMensual(g),0))}</strong>
               </div>
               <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                Anual: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeAnual(g),0))}</strong>
+                Filtrado/año: <strong style={{ color: 'var(--text0)', fontFamily: 'var(--mono)' }}>{formatDec(gastosFiltrados.filter(g=>g.activo!==false).reduce((s,g)=>s+importeAnual(g),0))}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                Total pagado: <strong style={{ color: 'var(--green)', fontFamily: 'var(--mono)' }}>{formatDec(totalPagadoP + totalPagadoA)}</strong>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal */}
-      {modal !== null && (
-        <ModalGasto gasto={modal?.id ? modal : null} onClose={() => setModal(null)} onSave={handleSave} />
+      {/* Modales */}
+      {modal !== null && <ModalGasto gasto={modal?.id ? modal : null} onClose={() => setModal(null)} onSave={handleSave} />}
+      {pagoModal && <ModalRegistrarPago gasto={pagoModal} onClose={() => setPagoModal(null)} onSave={async (data) => { await registrarPago(data); setPagoModal(null) }} />}
+      {liquidacionModal && deudorNombre && (
+        <ModalLiquidacion
+          deudor={deudorNombre} acreedor={acreedorNombre} importe={cantidadDeuda}
+          onClose={() => setLiquidacionModal(false)}
+          onConfirm={async (data) => { await crearLiquidacion(data); setLiquidacionModal(false) }}
+        />
       )}
 
-      {/* Confirm delete */}
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && setConfirmDelete(null)}>
           <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: 360, width: '100%', border: '1px solid var(--border)', textAlign: 'center' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)', marginBottom: 8 }}>Eliminar "{confirmDelete.nombre}"?</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>Esta accion no se puede deshacer.</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>Se eliminarán también todos los pagos registrados.</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>Cancelar</button>
               <button className="btn" style={{ background: 'var(--red)', color: '#fff', border: 'none' }} onClick={async () => { await eliminar(confirmDelete.id); setConfirmDelete(null) }}>Eliminar</button>
