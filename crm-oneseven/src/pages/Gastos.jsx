@@ -696,6 +696,216 @@ function ModalReembolso({ gasto, pagos, onClose, onSave }) {
   )
 }
 
+
+// ─── Modal Calendario de Gastos ────────────────────────────────────────────────
+function ModalCalendarioGastos({ gastos, onClose }) {
+  const hoy = new Date()
+  const [mesVista, setMesVista] = useState(hoy.getMonth())
+  const [anoVista, setAnoVista] = useState(hoy.getFullYear())
+  const [filtro, setFiltro] = useState('todos') // todos | mensual | anual | unico | trimestral
+
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const DIAS_SEMANA = ['L','M','X','J','V','S','D']
+
+  // Calcular días del mes
+  const primerDia = new Date(anoVista, mesVista, 1)
+  const ultimoDia = new Date(anoVista, mesVista + 1, 0)
+  const diasEnMes = ultimoDia.getDate()
+  // Lunes=0 ... Domingo=6
+  let inicioSemana = primerDia.getDay() - 1
+  if (inicioSemana < 0) inicioSemana = 6
+
+  // Obtener gastos activos con filtro
+  const activos = gastos.filter(g => g.activo !== false)
+  const filtrados = filtro === 'todos' ? activos : activos.filter(g => g.frecuencia === filtro)
+
+  // Construir mapa dia → gastos que caen en ese dia este mes
+  const gastosPorDia = {}
+
+  filtrados.forEach(g => {
+    const imp = parseFloat(g.importe) || 0
+
+    if (g.frecuencia === 'mensual') {
+      const dia = g.dia_cobro ? parseInt(g.dia_cobro) : (g.fecha_cobro ? new Date(g.fecha_cobro).getDate() : null)
+      if (dia && dia >= 1 && dia <= diasEnMes) {
+        if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+        gastosPorDia[dia].push({ ...g, imp })
+      }
+    }
+
+    if (g.frecuencia === 'trimestral' || g.frecuencia === 'semestral' || g.frecuencia === 'anual') {
+      // Usar fecha_cobro si existe
+      if (g.fecha_cobro) {
+        const fc = new Date(g.fecha_cobro)
+        if (fc.getMonth() === mesVista && fc.getFullYear() === anoVista) {
+          const dia = fc.getDate()
+          if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+          gastosPorDia[dia].push({ ...g, imp })
+        }
+        // Proyectar recurrencias futuras del mismo dia
+        else if (g.frecuencia !== 'anual') {
+          const mesesIntervalo = g.frecuencia === 'trimestral' ? 3 : 6
+          let fecha = new Date(fc)
+          while (fecha.getFullYear() < anoVista + 2) {
+            fecha = new Date(fecha.getFullYear(), fecha.getMonth() + mesesIntervalo, fecha.getDate())
+            if (fecha.getMonth() === mesVista && fecha.getFullYear() === anoVista) {
+              const dia = fecha.getDate()
+              if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+              gastosPorDia[dia].push({ ...g, imp })
+              break
+            }
+          }
+        }
+      } else if (g.dia_cobro) {
+        // Solo día del mes sin fecha exacta — mostrar en ese día si aplica la frecuencia
+        const dia = parseInt(g.dia_cobro)
+        if (dia >= 1 && dia <= diasEnMes) {
+          // Para anual solo mostrar si el mes coincide con fecha_cobro o en enero por defecto
+          if (g.frecuencia === 'mensual' || true) { // simplificado: si tiene dia_cobro, mostrar
+            if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+            gastosPorDia[dia].push({ ...g, imp })
+          }
+        }
+      }
+    }
+
+    if (g.frecuencia === 'unico' && g.fecha_cobro) {
+      const fc = new Date(g.fecha_cobro)
+      if (fc.getMonth() === mesVista && fc.getFullYear() === anoVista) {
+        const dia = fc.getDate()
+        if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+        gastosPorDia[dia].push({ ...g, imp })
+      }
+    }
+  })
+
+  // Total del mes
+  const totalMes = Object.values(gastosPorDia).flat().reduce((s,g) => s + g.imp, 0)
+
+  // Colores por frecuencia
+  const colorFrecuencia = { mensual:'#6366f1', trimestral:'#f59e0b', semestral:'#8b5cf6', anual:'#ef4444', unico:'#10b981' }
+
+  const irMes = (delta) => {
+    let m = mesVista + delta, a = anoVista
+    if (m > 11) { m = 0; a++ }
+    if (m < 0) { m = 11; a-- }
+    setMesVista(m); setAnoVista(a)
+  }
+
+  // Construir celdas del calendario
+  const celdas = []
+  for (let i = 0; i < inicioSemana; i++) celdas.push(null)
+  for (let d = 1; d <= diasEnMes; d++) celdas.push(d)
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={e => e.target===e.currentTarget && onClose()}>
+      <div style={{ background:'var(--bg1)', borderRadius:'var(--radius-lg)', width:'100%', maxWidth:780, maxHeight:'90vh', overflow:'hidden', display:'flex', flexDirection:'column', border:'1px solid var(--border)' }}>
+
+        {/* Header */}
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div>
+            <div style={{ fontSize:16, fontWeight:600, color:'var(--text0)' }}>Calendario de gastos</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>Total visible: <strong style={{ fontFamily:'var(--mono)', color:'var(--text0)' }}>{formatDec(totalMes)}</strong></div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {/* Filtros */}
+            <div style={{ display:'flex', gap:4 }}>
+              {[
+                { id:'todos', label:'Todos' },
+                { id:'mensual', label:'Mensual' },
+                { id:'trimestral', label:'Trim.' },
+                { id:'semestral', label:'Sem.' },
+                { id:'anual', label:'Anual' },
+                { id:'unico', label:'Único' },
+              ].map(f => (
+                <button key={f.id} onClick={() => setFiltro(f.id)} style={{ padding:'4px 10px', borderRadius:20, fontSize:11, cursor:'pointer', border:`1px solid ${filtro===f.id ? (colorFrecuencia[f.id]||'var(--accent)') : 'var(--border2)'}`, background: filtro===f.id ? (colorFrecuencia[f.id]||'var(--accent)')+'20' : 'none', color: filtro===f.id ? (colorFrecuencia[f.id]||'var(--accent2)') : 'var(--text3)', fontWeight: filtro===f.id ? 600 : 400 }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={onClose} style={{ background:'var(--bg3)', border:'none', borderRadius:20, width:32, height:32, cursor:'pointer', color:'var(--text2)', fontSize:18, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+          </div>
+        </div>
+
+        {/* Nav mes */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          <button onClick={() => irMes(-1)} style={{ background:'var(--bg3)', border:'none', borderRadius:8, padding:'6px 14px', cursor:'pointer', color:'var(--text1)', fontSize:18 }}>‹</button>
+          <div style={{ fontSize:18, fontWeight:700, color:'var(--text0)' }}>{MESES[mesVista]} {anoVista}</div>
+          <button onClick={() => irMes(1)} style={{ background:'var(--bg3)', border:'none', borderRadius:8, padding:'6px 14px', cursor:'pointer', color:'var(--text1)', fontSize:18 }}>›</button>
+        </div>
+
+        {/* Leyenda */}
+        <div style={{ display:'flex', gap:12, padding:'8px 20px', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap' }}>
+          {Object.entries(colorFrecuencia).map(([k,v]) => (
+            <div key={k} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text3)' }}>
+              <div style={{ width:10, height:10, borderRadius:3, background:v }} />
+              {k.charAt(0).toUpperCase()+k.slice(1)}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendário */}
+        <div style={{ overflowY:'auto', flex:1, padding:'0 16px 16px' }}>
+          {/* Días semana */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4, marginTop:12, marginBottom:4 }}>
+            {DIAS_SEMANA.map(d => (
+              <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:600, color:'var(--text3)', padding:'4px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Celdas */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4 }}>
+            {celdas.map((dia, i) => {
+              if (!dia) return <div key={`empty-${i}`} style={{ minHeight:80 }} />
+              const gastosHoy = gastosPorDia[dia] || []
+              const esHoy = dia === hoy.getDate() && mesVista === hoy.getMonth() && anoVista === hoy.getFullYear()
+              const totalDia = gastosHoy.reduce((s,g) => s+g.imp, 0)
+              return (
+                <div key={dia} style={{ minHeight:80, padding:'6px 6px 4px', borderRadius:8, background: esHoy ? 'rgba(99,102,241,0.12)' : gastosHoy.length > 0 ? 'var(--bg3)' : 'var(--bg2)', border: esHoy ? '1px solid var(--accent)' : '1px solid var(--border)', position:'relative' }}>
+                  <div style={{ fontSize:12, fontWeight: esHoy ? 700 : 500, color: esHoy ? 'var(--accent2)' : 'var(--text2)', marginBottom:4 }}>{dia}</div>
+                  {gastosHoy.map((g,gi) => (
+                    <div key={gi} title={`${g.nombre} — ${formatDec(g.imp)}`} style={{ marginBottom:2, padding:'2px 5px', borderRadius:4, background: (colorFrecuencia[g.frecuencia]||'#6366f1')+'25', borderLeft:`2px solid ${colorFrecuencia[g.frecuencia]||'#6366f1'}`, cursor:'default' }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:'var(--text0)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{g.nombre}</div>
+                      <div style={{ fontSize:10, fontFamily:'var(--mono)', color: colorFrecuencia[g.frecuencia]||'#6366f1' }}>{formatDec(g.imp)}</div>
+                    </div>
+                  ))}
+                  {totalDia > 0 && (
+                    <div style={{ position:'absolute', bottom:3, right:5, fontSize:9, fontFamily:'var(--mono)', color:'var(--text3)', fontWeight:600 }}>{formatDec(totalDia)}</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Lista del mes */}
+        {Object.keys(gastosPorDia).length > 0 && (
+          <div style={{ borderTop:'1px solid var(--border)', padding:'12px 20px', maxHeight:180, overflowY:'auto', flexShrink:0 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>
+              Gastos en {MESES[mesVista]} ({Object.values(gastosPorDia).flat().length})
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {Object.entries(gastosPorDia).sort(([a],[b])=>parseInt(a)-parseInt(b)).map(([dia, gs]) =>
+                gs.map((g,i) => (
+                  <div key={`${dia}-${i}`} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, padding:'4px 8px', background:'var(--bg3)', borderRadius:6 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ width:8, height:8, borderRadius:2, background: colorFrecuencia[g.frecuencia]||'#6366f1', flexShrink:0 }} />
+                      <span style={{ color:'var(--text0)', fontWeight:500 }}>Día {dia}</span>
+                      <span style={{ color:'var(--text2)' }}>{g.nombre}</span>
+                      <span style={{ fontSize:10, padding:'1px 6px', borderRadius:10, background:'var(--bg4)', color:'var(--text3)' }}>{g.frecuencia}</span>
+                    </div>
+                    <span style={{ fontFamily:'var(--mono)', fontWeight:600, color: colorFrecuencia[g.frecuencia]||'var(--text0)' }}>{formatDec(g.imp)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Gastos() {
   const { gastos, crear, actualizar, eliminar } = useGastos()
   const { pagos, registrar: registrarPago, eliminar: eliminarPago } = usePagosGastos()
@@ -709,6 +919,7 @@ export default function Gastos() {
   const [expanded, setExpanded] = useState(null)
   const [verHistorial, setVerHistorial] = useState(null)
   const [reembolsoModal, setReembolsoModal] = useState(null)
+  const [calendarioModal, setCalendarioModal] = useState(false)
 
   const activos = gastos.filter(g => g.activo !== false)
 
@@ -820,7 +1031,7 @@ export default function Gastos() {
   return (
     <Layout title="Gastos empresa" subtitle="Control de costes y reparto" actions={
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => descargarCalendario(gastos)} style={{ gap: 5 }} title="Exportar al calendario"><CalendarIcon /> Calendario</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => setCalendarioModal(true)} style={{ gap: 5 }} title="Ver calendario de gastos"><CalendarIcon /> Calendario</button>
         <button className="btn btn-ghost btn-sm" onClick={generarResumenWA} style={{ gap: 5 }}><ShareIcon /> Resumen</button>
         <button className="btn btn-primary" onClick={() => setModal({})}><PlusIcon /> Nuevo gasto</button>
       </div>
@@ -1081,6 +1292,7 @@ export default function Gastos() {
 
       {/* Modales */}
       {modal !== null && <ModalGasto gasto={modal?.id ? modal : null} onClose={() => setModal(null)} onSave={handleSave} />}
+      {calendarioModal && <ModalCalendarioGastos gastos={gastos} onClose={() => setCalendarioModal(false)} />}
       {reembolsoModal && <ModalReembolso gasto={reembolsoModal} pagos={pagos} onClose={() => setReembolsoModal(null)} onSave={async (data) => { await registrarPago(data); setReembolsoModal(null) }} />}
       {pagoModal && <ModalRegistrarPago gasto={pagoModal} onClose={() => setPagoModal(null)} onSave={async (data) => { await registrarPago(data); setPagoModal(null) }} />}
       {liquidacionModal && deudorNombre && (
