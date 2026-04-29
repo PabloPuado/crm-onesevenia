@@ -241,7 +241,7 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
   const [form, setForm] = useState({
     cliente_id: '', titulo: 'Presupuesto de servicios',
     fecha: new Date().toISOString().split('T')[0], validez: '15',
-    intro: '', items: defaultItems,
+    intro: '',
     condiciones: 'El presupuesto tiene una validez de 15 dias naturales desde su emision.\n\nEl 50% del importe se abona al inicio del proyecto y el 50% restante a la entrega.\n\nPrecios sin IVA. IVA aplicable segun normativa vigente.',
     responsable: 'pablo', estado: 'borrador', descuento: '0', iva: '21',
     ...presupuesto,
