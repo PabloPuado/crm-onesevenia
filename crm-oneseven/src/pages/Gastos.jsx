@@ -143,8 +143,15 @@ function ModalRegistrarPago({ gasto, onClose, onSave }) {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const [saving, setSaving] = useState(false)
 
-  const pctP = parseFloat(gasto.pct_pablo) || 50
-  const pctA = parseFloat(gasto.pct_alberto) || 50
+  // Respetar si está imputado o no
+  const imputadoP = gasto.imputar_pablo !== false
+  const imputadoA = gasto.imputar_alberto !== false
+  const modoP = gasto.modo_pablo || 'pct'
+  const modoA = gasto.modo_alberto || 'pct'
+  const pctP = imputadoP ? (parseFloat(gasto.pct_pablo) || 0) : 0
+  const pctA = imputadoA ? (parseFloat(gasto.pct_alberto) || 0) : 0
+  const fijoP = imputadoP ? (parseFloat(gasto.fijo_pablo) || 0) : 0
+  const fijoA = imputadoA ? (parseFloat(gasto.fijo_alberto) || 0) : 0
   const imp = parseFloat(form.importe) || 0
 
   return (
@@ -572,8 +579,23 @@ export default function Gastos() {
   const totalPagadoA = pagos.filter(p => p.pagado_por === 'alberto').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
 
   // Lo que debería pagar cada uno según % (mensual)
-  const deberiaP = activos.reduce((s, g) => s + importeMensual(g) * (parseFloat(g.pct_pablo) || 50) / 100, 0)
-  const deberiaA = activos.reduce((s, g) => s + importeMensual(g) * (parseFloat(g.pct_alberto) || 50) / 100, 0)
+  // Calcular lo que debería pagar cada uno respetando imputar y modo fijo/pct
+  const calcParte = (g, persona) => {
+    const imp = importeMensual(g)
+    if (imp <= 0) return 0
+    const imputado = g[`imputar_${persona}`] !== false
+    if (!imputado) return 0
+    const modo = g[`modo_${persona}`] || 'pct'
+    if (modo === 'fijo') {
+      // Fijo mensualizado
+      const fijo = parseFloat(g[`fijo_${persona}`]) || 0
+      const impTotal = parseFloat(g.importe) || 0
+      return impTotal > 0 ? imp * (fijo / impTotal) : 0
+    }
+    return imp * (parseFloat(g[`pct_${persona}`]) || 0) / 100
+  }
+  const deberiaP = activos.reduce((s, g) => s + calcParte(g, 'pablo'), 0)
+  const deberiaA = activos.reduce((s, g) => s + calcParte(g, 'alberto'), 0)
 
   // Total liquidaciones
   const totalLiqP = liquidaciones.filter(l => l.pagador === 'pablo').reduce((s, l) => s + (parseFloat(l.importe)||0), 0)
@@ -586,8 +608,8 @@ export default function Gastos() {
   // Deuda simple: quien pagó más de lo que le tocaba
   let deudorNombre = null, acreedorNombre = null, cantidadDeuda = 0
   if (pagos.length > 0) {
-    const diffP = totalPagadoP - (totalPagadoP + totalPagadoA) * (activos.reduce((s,g) => s + (parseFloat(g.pct_pablo)||50)/100 * importeMensual(g), 0) / Math.max(totalMensual, 0.01))
-    const diffA = totalPagadoA - (totalPagadoP + totalPagadoA) * (activos.reduce((s,g) => s + (parseFloat(g.pct_alberto)||50)/100 * importeMensual(g), 0) / Math.max(totalMensual, 0.01))
+    const diffP = totalPagadoP - deberiaP
+    const diffA = totalPagadoA - deberiaA
     if (diffA < -0.01) { deudorNombre = 'Alberto'; acreedorNombre = 'Pablo'; cantidadDeuda = Math.abs(diffA) }
     else if (diffP < -0.01) { deudorNombre = 'Pablo'; acreedorNombre = 'Alberto'; cantidadDeuda = Math.abs(diffP) }
   }
@@ -937,13 +959,18 @@ export default function Gastos() {
                       )}
                       {/* Split esperado */}
                       <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                        {[{ name: 'Pablo', pct: g.pct_pablo||50 }, { name: 'Alberto', pct: g.pct_alberto||50 }].map(p => {
-                          const pagadoPers = pagosGasto.filter(pg => pg.pagado_por === p.name.toLowerCase()).reduce((s, pg) => s + (parseFloat(pg.importe)||0), 0)
-                          const deberiaTotal = totalPagadoGasto * p.pct / 100
+                        {[{ name: 'Pablo', key: 'pablo' }, { name: 'Alberto', key: 'alberto' }].map(p => {
+                          const imputado = g[`imputar_${p.key}`] !== false
+                          const modo = g[`modo_${p.key}`] || 'pct'
+                          const pct = parseFloat(g[`pct_${p.key}`]) || 0
+                          const fijo = parseFloat(g[`fijo_${p.key}`]) || 0
+                          const fraccion = modo === 'fijo' && parseFloat(g.importe) > 0 ? fijo / parseFloat(g.importe) : pct / 100
+                          const pagadoPers = pagosGasto.filter(pg => pg.pagado_por === p.key).reduce((s, pg) => s + (parseFloat(pg.importe)||0), 0)
+                          const deberiaTotal = imputado ? totalPagadoGasto * fraccion : 0
                           const diff = pagadoPers - deberiaTotal
                           return (
                             <div key={p.name} style={{ flex: 1, padding: '8px 10px', background: 'var(--bg2)', borderRadius: 8, textAlign: 'center' }}>
-                              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name} ({p.pct}%)</div>
+                              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name}{imputado ? ` (${modo==='fijo' ? formatDec(fijo)+' fijo' : pct+'%'})` : ' (no imputado)'}</div>
                               <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--mono)', color: Math.abs(diff) < 0.01 ? 'var(--green)' : diff > 0 ? 'var(--green)' : 'var(--red)' }}>
                                 {formatDec(pagadoPers)} pagado
                               </div>
