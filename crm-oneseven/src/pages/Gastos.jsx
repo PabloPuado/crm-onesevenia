@@ -78,6 +78,7 @@ function ModalGasto({ gasto, onClose, onSave }) {
   const [form, setForm] = useState({
     nombre: '', categoria: 'software', categoria_custom: '', tipo: 'fijo',
     importe: '', frecuencia: 'mensual', dia_cobro: '', activo: true, notas: '',
+    pagado_por: 'pablo', pct_pablo: 50, pct_alberto: 50,
     ...gasto,
   })
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
@@ -156,6 +157,45 @@ function ModalGasto({ gasto, onClose, onSave }) {
               />
             </div>
           )}
+
+          {/* Split de pago */}
+          <div style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Reparto del gasto</div>
+            <div className="form-group">
+              <label className="form-label">Quién lo ha pagado</label>
+              <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)}>
+                <option value="pablo">Pablo</option>
+                <option value="alberto">Alberto</option>
+                <option value="ambos">Ambos (ya dividido)</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">% Pablo</label>
+                <input className="form-input" type="number" min="0" max="100" value={form.pct_pablo}
+                  onChange={e => { const v = parseFloat(e.target.value)||0; set('pct_pablo', v); set('pct_alberto', Math.max(0, 100-v)) }}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">% Alberto</label>
+                <input className="form-input" type="number" min="0" max="100" value={form.pct_alberto}
+                  onChange={e => { const v = parseFloat(e.target.value)||0; set('pct_alberto', v); set('pct_pablo', Math.max(0, 100-v)) }}
+                />
+              </div>
+            </div>
+            {form.importe && parseFloat(form.importe) > 0 && (
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                {[{name:'Pablo', pct: form.pct_pablo}, {name:'Alberto', pct: form.pct_alberto}].map(p => (
+                  <div key={p.name} style={{ flex: 1, padding: '8px 12px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>{p.name} ({p.pct}%)</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>
+                      {formatDec((parseFloat(form.importe)||0) * (parseFloat(p.pct)||0) / 100)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="form-group">
             <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
@@ -368,6 +408,7 @@ export default function Gastos() {
                     <div style={{ fontSize: 11, color: 'var(--text3)' }}>
                       {formatEur(parseFloat(g.importe))} {g.frecuencia === 'mensual' ? '/mes' : g.frecuencia === 'trimestral' ? '/trimestre' : g.frecuencia === 'semestral' ? '/semestre' : g.frecuencia === 'anual' ? '/ano' : '(pago unico)'}
                       {g.dia_cobro ? ` · cobra el dia ${g.dia_cobro}` : ''}
+                      {g.pagado_por ? ` · paga ${g.pagado_por === 'ambos' ? 'ambos' : g.pagado_por} (P:${g.pct_pablo||50}% A:${g.pct_alberto||50}%)` : ''}
                       {g.notas ? ` · ${g.notas}` : ''}
                     </div>
                   </div>
