@@ -271,3 +271,19 @@ export function useEmpresaConfig() {
   }
   return { config, loading, guardar }
 }
+
+export function useSubcontrataciones() {
+  const [subcontrataciones, setSubcontrataciones] = useState([])
+  const [loading, setLoading] = useState(true)
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('subcontrataciones').select('*').order('created_at', { ascending: false })
+    setSubcontrataciones(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+  const crear = async (s) => { const { data, error } = await supabase.from('subcontrataciones').insert([s]).select().single(); if (!error) setSubcontrataciones(prev => [data, ...prev]); return { data, error } }
+  const actualizar = async (id, u) => { const { data, error } = await supabase.from('subcontrataciones').update(u).eq('id', id).select().single(); if (!error) setSubcontrataciones(prev => prev.map(s => s.id === id ? data : s)); return { data, error } }
+  const eliminar = async (id) => { const { error } = await supabase.from('subcontrataciones').delete().eq('id', id); if (!error) setSubcontrataciones(prev => prev.filter(s => s.id !== id)); return { error } }
+  return { subcontrataciones, loading, fetch, crear, actualizar, eliminar }
+}
