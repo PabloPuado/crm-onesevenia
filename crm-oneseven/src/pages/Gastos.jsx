@@ -413,7 +413,7 @@ function SplitEditor({ form, set }) {
 function ModalGasto({ gasto, onClose, onSave }) {
   const [form, setForm] = useState({
     nombre: '', categoria: 'software', categoria_custom: '', tipo: 'fijo',
-    importe: '', frecuencia: 'mensual', dia_cobro: '', activo: true, notas: '',
+    importe: '', frecuencia: 'mensual', dia_cobro: '', fecha_cobro: '', activo: true, notas: '',
     pagado_por: 'pablo', pct_pablo: 50, pct_alberto: 50,
     imputar_pablo: true, imputar_alberto: true,
     modo_pablo: 'pct', modo_alberto: 'pct',
@@ -477,9 +477,15 @@ function ModalGasto({ gasto, onClose, onSave }) {
             </div>
           </div>
           {form.frecuencia !== 'unico' && (
-            <div className="form-group">
-              <label className="form-label">Día de cobro <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
-              <input className="form-input" type="number" min="1" max="31" value={form.dia_cobro || ''} onChange={e => set('dia_cobro', e.target.value ? parseInt(e.target.value) : null)} placeholder="Ej: 1, 15, 28..." />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+              <div className="form-group">
+                <label className="form-label">Próxima fecha de cobro <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
+                <input className="form-input" type="date" value={form.fecha_cobro || ''} onChange={e => set('fecha_cobro', e.target.value || null)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Día del mes <span style={{ fontSize: 10, color: 'var(--text3)' }}>(para recurrentes)</span></label>
+                <input className="form-input" type="number" min="1" max="31" value={form.dia_cobro || ''} onChange={e => set('dia_cobro', e.target.value ? parseInt(e.target.value) : null)} placeholder="Ej: 1, 15, 28..." />
+              </div>
             </div>
           )}
 
@@ -833,16 +839,25 @@ export default function Gastos() {
         const hoy = new Date()
         const en7dias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)
         const cobrosProximos = activos.filter(g => {
-          if (!g.dia_cobro) return false
           if (!['mensual','trimestral','semestral','anual'].includes(g.frecuencia)) return false
+          if (g.fecha_cobro) {
+            const fc = new Date(g.fecha_cobro)
+            return fc >= hoy && fc <= en7dias
+          }
+          if (!g.dia_cobro) return false
           const dia = parseInt(g.dia_cobro)
           const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
           const mesSig = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
           return (mesActual >= hoy && mesActual <= en7dias) || (mesSig >= hoy && mesSig <= en7dias)
         }).map(g => {
-          const dia = parseInt(g.dia_cobro)
-          const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
-          const fecha = mesActual >= hoy ? mesActual : new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+          let fecha
+          if (g.fecha_cobro) {
+            fecha = new Date(g.fecha_cobro)
+          } else {
+            const dia = parseInt(g.dia_cobro)
+            const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
+            fecha = mesActual >= hoy ? mesActual : new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+          }
           const diasRestantes = Math.ceil((fecha - hoy) / (1000 * 60 * 60 * 24))
           return { ...g, fecha, diasRestantes }
         }).sort((a, b) => a.diasRestantes - b.diasRestantes)
@@ -963,7 +978,7 @@ export default function Gastos() {
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text3)' }}>
                         {formatDec(parseFloat(g.importe))} {g.frecuencia === 'mensual' ? '/mes' : g.frecuencia === 'trimestral' ? '/trimestre' : g.frecuencia === 'semestral' ? '/semestre' : g.frecuencia === 'anual' ? '/año' : '(único)'}
-                        {g.dia_cobro ? ` · día ${g.dia_cobro}` : ''}
+                        {g.fecha_cobro ? ` · próx. cobro: ${g.fecha_cobro}` : g.dia_cobro ? ` · día ${g.dia_cobro}` : ''}
                         {` · P:${g.pct_pablo||50}% A:${g.pct_alberto||50}%`}
                         {pagosGasto.length > 0 ? ` · ${pagosGasto.length} pago${pagosGasto.length > 1 ? 's' : ''} (${formatDec(totalPagadoGasto)})` : ''}
                       </div>
