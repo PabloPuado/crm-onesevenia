@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useGastos, useClientes } from '../hooks/useData'
+import { useGastos, useClientes, usePagosGastos, useLiquidaciones } from '../hooks/useData'
 import { useIngresos } from '../hooks/useData'
 import { useTareas } from '../hooks/useData'
 import { useAuth } from '../context/AuthContext'
@@ -8,118 +8,121 @@ import { formatEur, OBJETIVO_ANUAL, getStage } from '../lib/constants'
 import { formatDate } from '../lib/constants'
 
 const OBJETIVO_MENSUAL_ALBERTO = 8000
+const fmt2 = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(Math.abs(parseFloat(n) || 0))
 
-
-// ─── Widget split de gastos ────────────────────────────────────────────────────
-function SplitGastosWidget({ gastos }) {
+// ─── Widget split de gastos (con pagos reales) ─────────────────────────────────
+function SplitGastosWidget({ gastos, pagos, liquidaciones }) {
   const activos = (gastos || []).filter(g => g.activo !== false)
+  const todosPagos = pagos || []
+  const todasLiq = liquidaciones || []
 
-  // Calcular lo que debe pagar cada uno según % acordado (mensual)
-  const importeMensual = (g) => {
-    const imp = parseFloat(g.importe) || 0
-    switch (g.frecuencia) {
-      case 'mensual': return imp
-      case 'trimestral': return imp / 3
-      case 'semestral': return imp / 6
-      case 'anual': return imp / 12
-      default: return 0
-    }
-  }
-
-  // Lo que cada uno DEBERÍA pagar según su % acordado
-  let deberiaP = 0, deberiaA = 0
-  // Lo que cada uno HA PAGADO realmente
-  let pagadoP = 0, pagadoA = 0
+  // Calcular para cada gasto: cuánto corresponde a cada uno
+  // y cuánto han pagado/reembolsado realmente
+  let totalCorrespP = 0, totalCorrespA = 0
+  let totalPagadoRealP = 0, totalPagadoRealA = 0
+  let totalReembAP = 0, totalReembPA = 0 // reembolsos entre ellos
 
   activos.forEach(g => {
-    const mensual = importeMensual(g)
-    if (mensual <= 0) return
-    const pctP = parseFloat(g.pct_pablo) || 50
-    const pctA = parseFloat(g.pct_alberto) || 50
+    const imp = parseFloat(g.importe) || 0
+    if (imp <= 0) return
 
-    // Lo que deberían pagar
-    deberiaP += mensual * pctP / 100
-    deberiaA += mensual * pctA / 100
+    const mP = g.modo_pablo || 'pct'
+    const mA = g.modo_alberto || 'pct'
+    const corrP = mP === 'fijo' ? (parseFloat(g.fijo_pablo)||0) : imp * (parseFloat(g.pct_pablo)||0) / 100
+    const corrA = mA === 'fijo' ? (parseFloat(g.fijo_alberto)||0) : imp * (parseFloat(g.pct_alberto)||0) / 100
 
-    // Lo que han pagado realmente
-    if (g.pagado_por === 'pablo') { pagadoP += mensual }
-    else if (g.pagado_por === 'alberto') { pagadoA += mensual }
-    else { pagadoP += mensual * pctP / 100; pagadoA += mensual * pctA / 100 }
+    totalCorrespP += corrP
+    totalCorrespA += corrA
+
+    // Pagos reales registrados para este gasto
+    const pagosGasto = todosPagos.filter(p => p.gasto_id === g.id)
+    const pagP = pagosGasto.filter(p => p.pagado_por === 'pablo' && p.tipo !== 'reembolso').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+    const pagA = pagosGasto.filter(p => p.pagado_por === 'alberto' && p.tipo !== 'reembolso').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+    const reAP = pagosGasto.filter(p => p.tipo === 'reembolso' && p.pagado_por === 'alberto').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+    const rePA = pagosGasto.filter(p => p.tipo === 'reembolso' && p.pagado_por === 'pablo').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+
+    totalPagadoRealP += pagP
+    totalPagadoRealA += pagA
+    totalReembAP += reAP
+    totalReembPA += rePA
   })
 
-  // Deuda: si Pablo pagó más de lo que le toca, Alberto le debe a Pablo
-  const totalPagado = pagadoP + pagadoA
-  const deudaP = deberiaP - pagadoP  // positivo = Pablo debe más de lo que pagó
-  const deudaA = deberiaA - pagadoA
+  // Liquidaciones globales (pagos directos entre ellos fuera de gastos concretos)
+  const liqAP = todasLiq.filter(l => l.pagador === 'alberto').reduce((s,l) => s + (parseFloat(l.importe)||0), 0)
+  const liqPA = todasLiq.filter(l => l.pagador === 'pablo').reduce((s,l) => s + (parseFloat(l.importe)||0), 0)
 
-  // Si deudaP > 0: Pablo ha pagado menos de lo que le toca → Pablo le debe a Alberto
-  // Si deudaA > 0: Alberto ha pagado menos → Alberto le debe a Pablo
-  const fmt = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(Math.abs(n))
+  // Saldo neto: cuánto ha pagado Pablo de más respecto a lo que le corresponde
+  // (incluyendo reembolsos recibidos)
+  const saldoNetoP = totalPagadoRealP - totalCorrespP + totalReembAP - totalReembPA + liqAP - liqPA
+  const saldoNetoA = totalPagadoRealA - totalCorrespA + totalReembPA - totalReembAP + liqPA - liqAP
 
+  // Deuda final
   let deudorNombre = null, acreedorNombre = null, cantidadDeuda = 0
-  if (deudaA > 0.01) { deudorNombre = 'Alberto'; acreedorNombre = 'Pablo'; cantidadDeuda = deudaA }
-  else if (deudaP > 0.01) { deudorNombre = 'Pablo'; acreedorNombre = 'Alberto'; cantidadDeuda = Math.abs(deudaP) }
+  if (saldoNetoA < -0.01) {
+    // Alberto tiene saldo negativo → debe a Pablo
+    deudorNombre = 'Alberto'; acreedorNombre = 'Pablo'; cantidadDeuda = Math.abs(saldoNetoA)
+  } else if (saldoNetoP < -0.01) {
+    deudorNombre = 'Pablo'; acreedorNombre = 'Alberto'; cantidadDeuda = Math.abs(saldoNetoP)
+  }
 
+  const tienePagos = totalPagadoRealP > 0 || totalPagadoRealA > 0
   if (activos.length === 0) return null
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
+    <div className="card" style={{ marginBottom: 16, marginTop: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 16 }}>
         Reparto de gastos — Pablo vs Alberto
       </div>
 
-      {/* Barras comparativas */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         {[
-          { nombre: 'Pablo', deberia: deberiaP, pagado: pagadoP, color: '#6366f1' },
-          { nombre: 'Alberto', deberia: deberiaA, pagado: pagadoA, color: '#06b6d4' },
-        ].map(p => {
-          const maxVal = Math.max(deberiaP, deberiaA, 1)
-          const diff = p.pagado - p.deberia
-          return (
-            <div key={p.nombre} style={{ padding: '12px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: `1px solid ${p.color}30` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: p.color }}>{p.nombre}</span>
-                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: diff >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: diff >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 500 }}>
-                  {diff >= 0 ? `+${fmt(diff)} a favor` : `${fmt(diff)} pendiente`}
+          { nombre: 'Pablo', corresp: totalCorrespP, pagado: totalPagadoRealP, saldo: saldoNetoP, color: '#6366f1' },
+          { nombre: 'Alberto', corresp: totalCorrespA, pagado: totalPagadoRealA, saldo: saldoNetoA, color: '#06b6d4' },
+        ].map(p => (
+          <div key={p.nombre} style={{ padding: '12px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: `1px solid ${p.color}25` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: p.color }}>{p.nombre}</span>
+              {tienePagos && (
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: p.saldo >= -0.01 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: p.saldo >= -0.01 ? 'var(--green)' : 'var(--red)', fontWeight: 500 }}>
+                  {p.saldo >= -0.01 ? `+${fmt2(p.saldo)} a favor` : `${fmt2(p.saldo)} debe`}
                 </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>
-                <span>Debería pagar/mes</span>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text1)' }}>{fmt(p.deberia)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>
-                <span>Ha pagado/mes</span>
-                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, color: p.color }}>{fmt(p.pagado)}</span>
-              </div>
-              {/* Barra progreso */}
-              <div style={{ height: 6, background: 'var(--bg4)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min((p.pagado / Math.max(p.deberia, 0.01)) * 100, 100)}%`, background: diff >= 0 ? 'var(--green)' : p.color, borderRadius: 3, transition: 'width 0.4s' }} />
-              </div>
+              )}
             </div>
-          )
-        })}
+            {[
+              { label: 'Le corresponde pagar', value: fmt2(p.corresp) },
+              { label: 'Ha pagado (registrado)', value: fmt2(p.pagado), bold: true, color: p.color },
+            ].map(r => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text3)' }}>{r.label}</span>
+                <span style={{ fontFamily: 'var(--mono)', color: r.color || 'var(--text1)', fontWeight: r.bold ? 700 : 400 }}>{r.value}</span>
+              </div>
+            ))}
+            {tienePagos && (
+              <div style={{ marginTop: 8, height: 4, background: 'var(--bg4)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(p.corresp > 0 ? (p.pagado/p.corresp)*100 : 0, 100)}%`, background: p.saldo >= 0 ? 'var(--green)' : p.color, borderRadius: 2, transition: 'width 0.4s' }} />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Resultado: quién debe a quién */}
-      {deudorNombre ? (
+      {!tienePagos ? (
+        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--bg3)', border: '1px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--text3)' }}>
+          Sin pagos registrados — ve a Gastos y registra los pagos para ver las deudas
+        </div>
+      ) : deudorNombre ? (
         <div style={{ padding: '14px 18px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>↕</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>
-                <span style={{ color: 'var(--red)' }}>{deudorNombre}</span> debe a <span style={{ color: 'var(--green)' }}>{acreedorNombre}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Diferencia acumulada en gastos del mes</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>
+              <span style={{ color: 'var(--red)' }}>{deudorNombre}</span> debe a <span style={{ color: 'var(--green)' }}>{acreedorNombre}</span>
             </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Basado en pagos reales registrados</div>
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--red)' }}>
-            {fmt(cantidadDeuda)}
-          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--red)' }}>{fmt2(cantidadDeuda)}</div>
         </div>
       ) : (
-        <div style={{ padding: '12px 18px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
-          Estais al dia — sin deudas entre vosotros
+        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
+          Estáis al día — sin deudas pendientes
         </div>
       )}
     </div>
@@ -129,6 +132,8 @@ function SplitGastosWidget({ gastos }) {
 export default function Dashboard() {
   const { clientes } = useClientes()
   const { gastos } = useGastos()
+  const { pagos } = usePagosGastos()
+  const { liquidaciones } = useLiquidaciones()
   const { ingresos } = useIngresos()
   const { tareas } = useTareas()
   const { getUserName } = useAuth()
@@ -193,9 +198,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="stat-label">Tareas pendientes</div>
           <div className="stat-value">{stats.pendientes}</div>
-          {stats.vencidas > 0 && (
-            <div className="stat-sub" style={{ color: 'var(--red)' }}>{stats.vencidas} vencidas</div>
-          )}
+          {stats.vencidas > 0 && <div className="stat-sub" style={{ color: 'var(--red)' }}>{stats.vencidas} vencidas</div>}
           {stats.vencidas === 0 && <div className="stat-sub">Sin vencidas</div>}
         </div>
       </div>
@@ -282,7 +285,8 @@ export default function Dashboard() {
           })}
         </div>
       </div>
-      <SplitGastosWidget gastos={gastos} />
+
+      <SplitGastosWidget gastos={gastos} pagos={pagos} liquidaciones={liquidaciones} />
     </Layout>
   )
 }
