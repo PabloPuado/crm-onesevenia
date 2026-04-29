@@ -5,12 +5,97 @@ import { formatEur, formatDate } from '../lib/constants'
 
 const formatDec = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(n) || 0)
 
+
+// ─── Generador ICS (calendario) ───────────────────────────────────────────────
+function generarICS(gastos) {
+  const activos = gastos.filter(g => g.activo !== false && g.dia_cobro && ['mensual','trimestral','semestral','anual'].includes(g.frecuencia))
+  if (activos.length === 0) return null
+
+  const pad = n => String(n).padStart(2, '0')
+  const now = new Date()
+  const anoActual = now.getFullYear()
+
+  let eventos = []
+
+  activos.forEach(g => {
+    const dia = parseInt(g.dia_cobro)
+    const imp = parseFloat(g.importe) || 0
+    const nombre = `${g.nombre} — ${new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(imp)}`
+    const desc = `Gasto: ${g.nombre}\nImporte: ${new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(imp)}\nFrecuencia: ${g.frecuencia}\nPagado por: ${g.pagado_por || 'Pablo'}`
+
+    const meses = g.frecuencia === 'mensual' ? [1,2,3,4,5,6,7,8,9,10,11,12]
+      : g.frecuencia === 'trimestral' ? [1,4,7,10]
+      : g.frecuencia === 'semestral' ? [1,7]
+      : [1]
+
+    // Generar 2 años de eventos
+    for (let ano = anoActual; ano <= anoActual + 1; ano++) {
+      meses.forEach(mes => {
+        // Día máximo del mes
+        const maxDia = new Date(ano, mes, 0).getDate()
+        const diaReal = Math.min(dia, maxDia)
+        const dtstart = `${ano}${pad(mes)}${pad(diaReal)}`
+        const uid = `gasto-${g.id}-${ano}-${pad(mes)}@crm-onesevenia`
+
+        eventos.push([
+          'BEGIN:VEVENT',
+          `UID:${uid}`,
+          `DTSTART;VALUE=DATE:${dtstart}`,
+          `DTEND;VALUE=DATE:${dtstart}`,
+          `SUMMARY:💳 ${nombre}`,
+          `DESCRIPTION:${desc}`,
+          `CATEGORIES:GASTOS,CRM`,
+          `BEGIN:VALARM`,
+          `TRIGGER:-PT9H`,
+          `ACTION:DISPLAY`,
+          `DESCRIPTION:Recordatorio: ${g.nombre} se cobra hoy`,
+          `END:VALARM`,
+          'END:VEVENT'
+        ].join('\r\n'))
+      })
+    }
+  })
+
+  if (eventos.length === 0) return null
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//ONESEVEN CRM//Gastos//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Gastos ONESEVEN CRM',
+    'X-WR-CALDESC:Recordatorios de gastos recurrentes',
+    'X-WR-TIMEZONE:Europe/Madrid',
+    ...eventos,
+    'END:VCALENDAR'
+  ].join('\r\n')
+
+  return ics
+}
+
+function descargarCalendario(gastos) {
+  const ics = generarICS(gastos)
+  if (!ics) {
+    alert('No hay gastos recurrentes con día de cobro configurado. Edita los gastos y añade el día de cobro.')
+    return
+  }
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'gastos-crm-oneseven.ics'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg> }
 function EditIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 2l2 2-7 7H2V9L9 2z"/></svg> }
 function TrashIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h9M5 3V2h3v1M3 3l.5 8h6l.5-8"/></svg> }
 function CloseIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg> }
 function CheckIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6.5l4 4 5-6"/></svg> }
 function ChevronIcon({ open }) { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><path d="M3 5l4 4 4-4"/></svg> }
+function CalendarIcon() { return <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="2" width="12" height="11" rx="1"/><path d="M1 6h12M5 1v2M9 1v2"/></svg> }
 function ShareIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 1l3 3-3 3M12 4H5a4 4 0 0 0 0 8h1"/></svg> }
 
 const CATEGORIAS = ['software', 'marketing', 'personal', 'oficina', 'servicios', 'infraestructura', 'formacion', 'legal', 'bancario', 'otros']
@@ -572,6 +657,7 @@ export default function Gastos() {
   return (
     <Layout title="Gastos empresa" subtitle="Control de costes y reparto" actions={
       <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => descargarCalendario(gastos)} style={{ gap: 5 }} title="Exportar al calendario"><CalendarIcon /> Calendario</button>
         <button className="btn btn-ghost btn-sm" onClick={generarResumenWA} style={{ gap: 5 }}><ShareIcon /> Resumen</button>
         <button className="btn btn-primary" onClick={() => setModal({})}><PlusIcon /> Nuevo gasto</button>
       </div>
@@ -584,6 +670,38 @@ export default function Gastos() {
           <span style={{ fontSize: 11, color: 'var(--text3)' }}>{pendientesMes.map(g => g.nombre).join(', ')}</span>
         </div>
       )}
+
+      {/* Próximos cobros */}
+      {(() => {
+        const hoy = new Date()
+        const en7dias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)
+        const cobrosProximos = activos.filter(g => {
+          if (!g.dia_cobro) return false
+          if (!['mensual','trimestral','semestral','anual'].includes(g.frecuencia)) return false
+          const dia = parseInt(g.dia_cobro)
+          const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
+          const mesSig = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+          return (mesActual >= hoy && mesActual <= en7dias) || (mesSig >= hoy && mesSig <= en7dias)
+        }).map(g => {
+          const dia = parseInt(g.dia_cobro)
+          const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
+          const fecha = mesActual >= hoy ? mesActual : new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+          const diasRestantes = Math.ceil((fecha - hoy) / (1000 * 60 * 60 * 24))
+          return { ...g, fecha, diasRestantes }
+        }).sort((a, b) => a.diasRestantes - b.diasRestantes)
+
+        if (cobrosProximos.length === 0) return null
+        return (
+          <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 'var(--radius)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent2)', flexShrink: 0 }}>📅 Próximos 7 días:</span>
+            {cobrosProximos.map(g => (
+              <span key={g.id} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: g.diasRestantes === 0 ? 'rgba(239,68,68,0.15)' : g.diasRestantes <= 2 ? 'rgba(245,158,11,0.15)' : 'var(--bg4)', color: g.diasRestantes === 0 ? 'var(--red)' : g.diasRestantes <= 2 ? 'var(--amber)' : 'var(--text2)', fontWeight: 500 }}>
+                {g.nombre} — día {g.dia_cobro} ({g.diasRestantes === 0 ? 'hoy' : `en ${g.diasRestantes}d`}) — {formatDec(g.importe)}
+              </span>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
