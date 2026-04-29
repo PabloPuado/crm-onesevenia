@@ -19,14 +19,14 @@ function makeHook(table, selectQuery = '*', orderCol = 'created_at') {
     useEffect(() => { fetch() }, [fetch])
 
     const crear = async (payload) => {
-      const { error } = await supabase.from(table).insert([payload])
+      const { error } = await supabase.from(table).insert([sanitize(payload)])
       if (error) return { error }
       await fetch() // always re-fetch
       return { error: null }
     }
 
     const actualizar = async (id, updates) => {
-      const { error } = await supabase.from(table).update(updates).eq('id', id)
+      const { error } = await supabase.from(table).update(sanitize(updates)).eq('id', id)
       if (error) return { error }
       await fetch()
       return { error: null }
@@ -43,6 +43,15 @@ function makeHook(table, selectQuery = '*', orderCol = 'created_at') {
   }
 }
 
+
+// Sanitize payload — converts empty strings to null to prevent Supabase uuid/type errors
+function sanitize(obj) {
+  if (!obj || typeof obj !== 'object') return obj
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === '' || v === undefined ? null : v])
+  )
+}
+
 // ─── Clientes ─────────────────────────────────────────────────────────────────
 export function useClientes() {
   const [clientes, setClientes] = useState([])
@@ -57,13 +66,13 @@ export function useClientes() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('clientes').insert([payload])
+    const { error } = await supabase.from('clientes').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('clientes').update(updates).eq('id', id)
+    const { error } = await supabase.from('clientes').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -93,13 +102,13 @@ export function useTareas(clienteId = null) {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('tareas').insert([payload])
+    const { error } = await supabase.from('tareas').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('tareas').update(updates).eq('id', id)
+    const { error } = await supabase.from('tareas').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -127,13 +136,13 @@ export function useIngresos() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('ingresos').insert([payload])
+    const { error } = await supabase.from('ingresos').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('ingresos').update(updates).eq('id', id)
+    const { error } = await supabase.from('ingresos').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -196,7 +205,7 @@ export function useActividad(clienteId = null) {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('actividad').insert([payload])
+    const { error } = await supabase.from('actividad').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -224,13 +233,13 @@ export function usePropuestas() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('propuestas').insert([payload])
+    const { error } = await supabase.from('propuestas').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('propuestas').update(updates).eq('id', id)
+    const { error } = await supabase.from('propuestas').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -258,13 +267,13 @@ export function usePresupuestos() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('presupuestos').insert([payload])
+    const { error } = await supabase.from('presupuestos').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('presupuestos').update(updates).eq('id', id)
+    const { error } = await supabase.from('presupuestos').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -292,13 +301,13 @@ export function useGastos() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('gastos').insert([payload])
+    const { error } = await supabase.from('gastos').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('gastos').update(updates).eq('id', id)
+    const { error } = await supabase.from('gastos').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
@@ -327,10 +336,10 @@ export function useEmpresaConfig() {
 
   const guardar = async (updates) => {
     if (config?.id) {
-      const { error } = await supabase.from('empresa_config').update(updates).eq('id', config.id)
+      const { error } = await supabase.from('empresa_config').update(sanitize(updates)).eq('id', config.id)
       if (error) return { error }
     } else {
-      const { error } = await supabase.from('empresa_config').insert([updates])
+      const { error } = await supabase.from('empresa_config').insert([sanitize(updates)])
       if (error) return { error }
     }
     await fetch()
@@ -353,13 +362,13 @@ export function useSubcontrataciones() {
   useEffect(() => { fetch() }, [fetch])
 
   const crear = async (payload) => {
-    const { error } = await supabase.from('subcontrataciones').insert([payload])
+    const { error } = await supabase.from('subcontrataciones').insert([sanitize(payload)])
     if (error) return { error }
     await fetch()
     return { error: null }
   }
   const actualizar = async (id, updates) => {
-    const { error } = await supabase.from('subcontrataciones').update(updates).eq('id', id)
+    const { error } = await supabase.from('subcontrataciones').update(sanitize(updates)).eq('id', id)
     if (error) return { error }
     await fetch()
     return { error: null }
