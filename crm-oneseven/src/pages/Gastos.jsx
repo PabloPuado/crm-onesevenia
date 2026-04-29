@@ -567,6 +567,128 @@ function ModalLiquidacion({ deudor, acreedor, importe, onClose, onConfirm }) {
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
+
+// ─── Modal reembolso parcial ──────────────────────────────────────────────────
+function ModalReembolso({ gasto, pagos, onClose, onSave }) {
+  const pagosGasto = pagos.filter(p => p.gasto_id === gasto.id && p.tipo !== 'reembolso')
+  const pagadoP = pagosGasto.filter(p => p.pagado_por === 'pablo').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+  const pagadoA = pagosGasto.filter(p => p.pagado_por === 'alberto').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+  const reembolsadoAP = pagos.filter(p => p.gasto_id === gasto.id && p.tipo === 'reembolso' && p.pagado_por === 'alberto').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+  const reembolsadoPA = pagos.filter(p => p.gasto_id === gasto.id && p.tipo === 'reembolso' && p.pagado_por === 'pablo').reduce((s,p) => s + (parseFloat(p.importe)||0), 0)
+
+  const mP = gasto.modo_pablo || 'pct'
+  const mA = gasto.modo_alberto || 'pct'
+  const corrP = mP === 'fijo' ? (parseFloat(gasto.fijo_pablo)||0) : (parseFloat(gasto.importe)||0) * (parseFloat(gasto.pct_pablo)||0) / 100
+  const corrA = mA === 'fijo' ? (parseFloat(gasto.fijo_alberto)||0) : (parseFloat(gasto.importe)||0) * (parseFloat(gasto.pct_alberto)||0) / 100
+
+  // Determinar quién debe a quién
+  const deudaA = corrA - reembolsadoAP  // Alberto debe a Pablo
+  const deudaP = corrP - reembolsadoPA  // Pablo debe a Alberto
+  const quienPago = pagadoP > pagadoA ? 'pablo' : 'alberto'
+  const quienDebe = pagadoP > pagadoA ? 'alberto' : 'pablo'
+  const pendiente = pagadoP > pagadoA ? deudaA : deudaP
+
+  const [form, setForm] = useState({
+    gasto_id: gasto.id,
+    pagado_por: quienDebe,
+    importe: pendiente > 0 ? pendiente.toFixed(2) : '',
+    fecha: new Date().toISOString().split('T')[0],
+    notas: '',
+    tipo: 'reembolso',
+  })
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const [saving, setSaving] = useState(false)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'var(--bg1)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 460, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text0)' }}>Registrar reembolso parcial</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{gasto.nombre}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><CloseIcon /></button>
+        </div>
+        <div style={{ padding: 20 }}>
+          {/* Resumen situación actual */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Situación actual</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[
+                { name: 'Pablo', pagado: pagadoP, corresponde: corrP, reembolsado: reembolsadoPA, color: '#6366f1' },
+                { name: 'Alberto', pagado: pagadoA, corresponde: corrA, reembolsado: reembolsadoAP, color: '#06b6d4' },
+              ].map(p => (
+                <div key={p.name} style={{ flex: 1, padding: '10px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: p.color, marginBottom: 6 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>Pagado: <span style={{ color: 'var(--text1)', fontFamily: 'var(--mono)' }}>{formatDec(p.pagado)}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>Le corresponde: <span style={{ color: 'var(--text1)', fontFamily: 'var(--mono)' }}>{formatDec(p.corresponde)}</span></div>
+                  {p.reembolsado > 0 && <div style={{ fontSize: 11, color: 'var(--amber)' }}>Ya reembolsado: {formatDec(p.reembolsado)}</div>}
+                </div>
+              ))}
+            </div>
+            {pendiente > 0.01 && (
+              <div style={{ marginTop: 10, textAlign: 'center', fontSize: 13, color: 'var(--text0)' }}>
+                <span style={{ color: 'var(--red)', fontWeight: 600 }}>{quienDebe === 'pablo' ? 'Pablo' : 'Alberto'}</span>
+                {' debe a '}
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>{quienPago === 'pablo' ? 'Pablo' : 'Alberto'}</span>
+                {': '}
+                <strong style={{ fontFamily: 'var(--mono)', color: 'var(--amber)' }}>{formatDec(pendiente)}</strong>
+                {' (pendiente)'}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group">
+              <label className="form-label">Quién hace el reembolso</label>
+              <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)}>
+                <option value="pablo">Pablo → Alberto</option>
+                <option value="alberto">Alberto → Pablo</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Importe reembolsado (€)</label>
+              <input className="form-input" type="number" step="0.01" value={form.importe} onChange={e => set('importe', e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="form-group">
+              <label className="form-label">Fecha</label>
+              <input className="form-input" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)' }}>(Bizum, transferencia...)</span></label>
+              <input className="form-input" value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Ref. Bizum, transferencia..." />
+            </div>
+          </div>
+
+          {/* Nuevo pendiente tras este reembolso */}
+          {form.importe && parseFloat(form.importe) > 0 && (
+            <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.08)', borderRadius: 8, marginBottom: 16, fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>
+              Tras este reembolso quedará pendiente:{' '}
+              <strong style={{ fontFamily: 'var(--mono)', color: Math.max(0, pendiente - parseFloat(form.importe)) < 0.01 ? 'var(--green)' : 'var(--amber)' }}>
+                {formatDec(Math.max(0, pendiente - parseFloat(form.importe)))}
+              </strong>
+              {Math.max(0, pendiente - parseFloat(form.importe)) < 0.01 && ' — Saldado ✓'}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn btn-primary" disabled={saving || !form.importe} onClick={async () => {
+              setSaving(true)
+              await onSave({ ...form, importe: parseFloat(form.importe), periodo: '' })
+              setSaving(false)
+            }}>
+              {saving ? 'Registrando...' : 'Registrar reembolso'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Gastos() {
   const { gastos, crear, actualizar, eliminar } = useGastos()
   const { pagos, registrar: registrarPago, eliminar: eliminarPago } = usePagosGastos()
@@ -579,6 +701,7 @@ export default function Gastos() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [expanded, setExpanded] = useState(null)
   const [verHistorial, setVerHistorial] = useState(null)
+  const [reembolsoModal, setReembolsoModal] = useState(null)
 
   const activos = gastos.filter(g => g.activo !== false)
 
@@ -942,27 +1065,35 @@ export default function Gastos() {
                   {/* Historial de pagos expandible */}
                   {isExpanded && (
                     <div style={{ padding: '0 18px 14px 66px', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
-                        Historial de pagos ({pagosGasto.length})
-                        {pagosGasto.length > 0 && <span style={{ fontFamily: 'var(--mono)', color: 'var(--text1)', marginLeft: 10, textTransform: 'none', fontWeight: 400 }}>Total: {formatDec(totalPagadoGasto)}</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                          Historial de pagos ({pagosGasto.length})
+                          {pagosGasto.length > 0 && <span style={{ fontFamily: 'var(--mono)', color: 'var(--text1)', marginLeft: 10, textTransform: 'none', fontWeight: 400 }}>Total: {formatDec(totalPagadoGasto)}</span>}
+                        </div>
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, gap: 4, color: 'var(--amber)' }} onClick={() => setReembolsoModal(g)}>
+                          + Reembolso parcial
+                        </button>
                       </div>
                       {pagosGasto.length === 0 ? (
                         <div style={{ fontSize: 13, color: 'var(--text3)', fontStyle: 'italic' }}>Sin pagos registrados aún</div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {pagosGasto.map(p => (
-                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8 }}>
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: p.tipo === 'reembolso' ? 'rgba(245,158,11,0.08)' : 'var(--bg3)', borderRadius: 8, border: p.tipo === 'reembolso' ? '1px solid rgba(245,158,11,0.2)' : 'none' }}>
                               <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.pagado_por === 'pablo' ? 'rgba(99,102,241,0.15)' : 'rgba(6,182,212,0.15)', color: p.pagado_por === 'pablo' ? '#6366f1' : '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                                {p.pagado_por === 'pablo' ? 'P' : 'A'}
+                                {p.tipo === 'reembolso' ? '↩' : (p.pagado_por === 'pablo' ? 'P' : 'A')}
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text0)' }}>
-                                  {p.pagado_por === 'pablo' ? 'Pablo' : 'Alberto'} · {formatDate(p.fecha)}
+                                  {p.tipo === 'reembolso'
+                                    ? <span style={{ color: 'var(--amber)' }}>Reembolso: {p.pagado_por === 'pablo' ? 'Pablo' : 'Alberto'} → {p.pagado_por === 'pablo' ? 'Alberto' : 'Pablo'}</span>
+                                    : (p.pagado_por === 'pablo' ? 'Pablo' : 'Alberto')}
+                                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 6 }}>· {formatDate(p.fecha)}</span>
                                   {p.periodo && <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>Periodo: {p.periodo}</span>}
                                 </div>
                                 {p.notas && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.notas}</div>}
                               </div>
-                              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--green)' }}>{formatDec(p.importe)}</span>
+                              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: p.tipo === 'reembolso' ? 'var(--amber)' : 'var(--green)' }}>{formatDec(p.importe)}</span>
                               <button className="btn-icon" style={{ width: 24, height: 24, color: 'var(--red)' }} onClick={() => eliminarPago(p.id)} title="Eliminar registro"><TrashIcon /></button>
                             </div>
                           ))}
@@ -1014,6 +1145,7 @@ export default function Gastos() {
 
       {/* Modales */}
       {modal !== null && <ModalGasto gasto={modal?.id ? modal : null} onClose={() => setModal(null)} onSave={handleSave} />}
+      {reembolsoModal && <ModalReembolso gasto={reembolsoModal} pagos={pagos} onClose={() => setReembolsoModal(null)} onSave={async (data) => { await registrarPago(data); setReembolsoModal(null) }} />}
       {pagoModal && <ModalRegistrarPago gasto={pagoModal} onClose={() => setPagoModal(null)} onSave={async (data) => { await registrarPago(data); setPagoModal(null) }} />}
       {liquidacionModal && deudorNombre && (
         <ModalLiquidacion
