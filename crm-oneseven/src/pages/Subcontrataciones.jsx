@@ -529,8 +529,17 @@ export default function Subcontrataciones() {
   }, [subcontrataciones, busqueda, devFiltro, estadoFiltro])
 
   const handleSave = async (form) => {
-    if (editando?.id) await actualizar(editando.id, form)
-    else await crear(form)
+    // Sanitize: convert empty strings to null for uuid/numeric fields
+    const clean = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => {
+        if (v === '' || v === undefined) return [k, null]
+        return [k, v]
+      })
+    )
+    const { error } = editando?.id
+      ? await actualizar(editando.id, clean)
+      : await crear(clean)
+    if (error) { alert('Error al guardar: ' + (error.message || JSON.stringify(error))); return }
     setVista('lista'); setEditando(null)
   }
 
