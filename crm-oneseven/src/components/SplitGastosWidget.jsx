@@ -28,11 +28,24 @@ function calcularSplitGastos(gastos, pagos, liquidaciones) {
   })
   const liqAP = todasLiq.filter(l => l.pagador === 'alberto').reduce((s,l) => s+(parseFloat(l.importe)||0), 0)
   const liqPA = todasLiq.filter(l => l.pagador === 'pablo').reduce((s,l) => s+(parseFloat(l.importe)||0), 0)
+
+  // Deuda final = suma de pendientes por línea (ya descontados reembolsos) +/- liquidaciones globales
+  const pendienteAP = lineasDeuda.filter(l => l.deudor === 'Alberto').reduce((s,l) => s + l.pendiente, 0)
+  const pendientePA = lineasDeuda.filter(l => l.deudor === 'Pablo').reduce((s,l) => s + l.pendiente, 0)
+
+  // Neto: Alberto debe a Pablo (pendienteAP) menos lo que Pablo debe a Alberto (pendientePA)
+  // más liquidaciones: si Alberto ya pagó liquidaciones a Pablo, reduce su deuda
+  const netoAdeudaAPablo = pendienteAP - pendientePA - liqAP + liqPA
+  const netoPadeudaAAlberto = pendientePA - pendienteAP - liqPA + liqAP
+
+  // Saldo para mostrar en tarjetas (pagado real vs lo que corresponde, sin reembolsos)
   const saldoNetoP = totalPagadoRealP - totalCorrespP + liqAP - liqPA
   const saldoNetoA = totalPagadoRealA - totalCorrespA + liqPA - liqAP
+
   let deudorFinal = null, acreedorFinal = null, cantidadFinal = 0
-  if (saldoNetoA < -0.01) { deudorFinal = 'Alberto'; acreedorFinal = 'Pablo'; cantidadFinal = Math.abs(saldoNetoA) }
-  else if (saldoNetoP < -0.01) { deudorFinal = 'Pablo'; acreedorFinal = 'Alberto'; cantidadFinal = Math.abs(saldoNetoP) }
+  if (netoAdeudaAPablo > 0.01) { deudorFinal = 'Alberto'; acreedorFinal = 'Pablo'; cantidadFinal = netoAdeudaAPablo }
+  else if (netoPadeudaAAlberto > 0.01) { deudorFinal = 'Pablo'; acreedorFinal = 'Alberto'; cantidadFinal = netoPadeudaAAlberto }
+
   return { totalCorrespP, totalCorrespA, totalPagadoRealP, totalPagadoRealA, saldoNetoP, saldoNetoA, deudorFinal, acreedorFinal, cantidadFinal, lineasDeuda, tienePagos: totalPagadoRealP > 0 || totalPagadoRealA > 0 }
 }
 
