@@ -435,7 +435,7 @@ function ModalGasto({ gasto, onClose, onSave }) {
             <label className="form-label">Nombre *</label>
             <input className="form-input" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: n8n, Vercel, Alquiler..." autoFocus />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: form.frecuencia === 'unico' ? '1fr' : '1fr 1fr', gap: '0 12px' }}>
             <div className="form-group">
               <label className="form-label">Categoría</label>
               <select className="form-select" value={CATEGORIAS.includes(form.categoria) ? form.categoria : '__custom__'} onChange={e => {
@@ -446,13 +446,15 @@ function ModalGasto({ gasto, onClose, onSave }) {
                 <option value="__custom__">+ Personalizada...</option>
               </select>
             </div>
-            <div className="form-group">
-              <label className="form-label">Tipo</label>
-              <select className="form-select" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
-                <option value="fijo">Fijo</option>
-                <option value="variable">Variable</option>
-              </select>
-            </div>
+            {form.frecuencia !== 'unico' && (
+              <div className="form-group">
+                <label className="form-label">Tipo</label>
+                <select className="form-select" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
+                  <option value="fijo">Fijo</option>
+                  <option value="variable">Variable</option>
+                </select>
+              </div>
+            )}
           </div>
           {(!CATEGORIAS.includes(form.categoria)) && (
             <div className="form-group">
@@ -476,7 +478,12 @@ function ModalGasto({ gasto, onClose, onSave }) {
               </select>
             </div>
           </div>
-          {form.frecuencia !== 'unico' && (
+          {form.frecuencia === 'unico' ? (
+            <div className="form-group">
+              <label className="form-label">Fecha en que se realizó / realizará el pago</label>
+              <input className="form-input" type="date" value={form.fecha_cobro || ''} onChange={e => set('fecha_cobro', e.target.value || null)} />
+            </div>
+          ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
               <div className="form-group">
                 <label className="form-label">Próxima fecha de cobro <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
@@ -734,34 +741,34 @@ function ModalCalendarioGastos({ gastos, onClose }) {
     }
 
     if (g.frecuencia === 'trimestral' || g.frecuencia === 'semestral' || g.frecuencia === 'anual') {
-      // Usar fecha_cobro si existe
       if (g.fecha_cobro) {
-        const fc = new Date(g.fecha_cobro)
-        if (fc.getMonth() === mesVista && fc.getFullYear() === anoVista) {
-          const dia = fc.getDate()
-          if (!gastosPorDia[dia]) gastosPorDia[dia] = []
-          gastosPorDia[dia].push({ ...g, imp })
+        const fc = new Date(g.fecha_cobro + 'T12:00:00')
+        const mesesIntervalo = g.frecuencia === 'trimestral' ? 3 : g.frecuencia === 'semestral' ? 6 : 12
+        // Proyectar todas las ocurrencias y ver si alguna cae en este mes/año
+        let fecha = new Date(fc)
+        // Ir hacia atrás hasta antes del inicio del periodo
+        while (fecha > new Date(anoVista, mesVista, 1)) {
+          fecha = new Date(fecha.getFullYear(), fecha.getMonth() - mesesIntervalo, fecha.getDate())
         }
-        // Proyectar recurrencias futuras del mismo dia
-        else if (g.frecuencia !== 'anual') {
-          const mesesIntervalo = g.frecuencia === 'trimestral' ? 3 : 6
-          let fecha = new Date(fc)
-          while (fecha.getFullYear() < anoVista + 2) {
-            fecha = new Date(fecha.getFullYear(), fecha.getMonth() + mesesIntervalo, fecha.getDate())
-            if (fecha.getMonth() === mesVista && fecha.getFullYear() === anoVista) {
-              const dia = fecha.getDate()
-              if (!gastosPorDia[dia]) gastosPorDia[dia] = []
-              gastosPorDia[dia].push({ ...g, imp })
-              break
-            }
+        // Avanzar hasta encontrar si cae en el mes visible
+        while (fecha.getFullYear() < anoVista || (fecha.getFullYear() === anoVista && fecha.getMonth() <= mesVista)) {
+          if (fecha.getMonth() === mesVista && fecha.getFullYear() === anoVista) {
+            const dia = fecha.getDate()
+            if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+            gastosPorDia[dia].push({ ...g, imp })
+            break
           }
+          fecha = new Date(fecha.getFullYear(), fecha.getMonth() + mesesIntervalo, fecha.getDate())
         }
       } else if (g.dia_cobro) {
-        // Solo día del mes sin fecha exacta — mostrar en ese día si aplica la frecuencia
+        // Sin fecha exacta: para anual solo en enero, para trim en ene/abr/jul/oct, etc.
         const dia = parseInt(g.dia_cobro)
         if (dia >= 1 && dia <= diasEnMes) {
-          // Para anual solo mostrar si el mes coincide con fecha_cobro o en enero por defecto
-          if (g.frecuencia === 'mensual' || true) { // simplificado: si tiene dia_cobro, mostrar
+          let mostrar = false
+          if (g.frecuencia === 'trimestral') mostrar = [1,4,7,10].includes(mesVista + 1)
+          else if (g.frecuencia === 'semestral') mostrar = [1,7].includes(mesVista + 1)
+          else if (g.frecuencia === 'anual') mostrar = mesVista === 0
+          if (mostrar) {
             if (!gastosPorDia[dia]) gastosPorDia[dia] = []
             gastosPorDia[dia].push({ ...g, imp })
           }
@@ -769,13 +776,18 @@ function ModalCalendarioGastos({ gastos, onClose }) {
       }
     }
 
-    if (g.frecuencia === 'unico' && g.fecha_cobro) {
-      const fc = new Date(g.fecha_cobro)
-      if (fc.getMonth() === mesVista && fc.getFullYear() === anoVista) {
-        const dia = fc.getDate()
-        if (!gastosPorDia[dia]) gastosPorDia[dia] = []
-        gastosPorDia[dia].push({ ...g, imp })
+    if (g.frecuencia === 'unico') {
+      // Pago único: usar fecha_cobro si existe
+      const fechaRef = g.fecha_cobro || null
+      if (fechaRef) {
+        const fc = new Date(fechaRef + 'T12:00:00')
+        if (fc.getMonth() === mesVista && fc.getFullYear() === anoVista) {
+          const dia = fc.getDate()
+          if (!gastosPorDia[dia]) gastosPorDia[dia] = []
+          gastosPorDia[dia].push({ ...g, imp })
+        }
       }
+      // Si no tiene fecha, mostrar en el mes actual con dia 1 para que sea visible
     }
   })
 
