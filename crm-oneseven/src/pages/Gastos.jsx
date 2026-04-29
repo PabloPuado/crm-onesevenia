@@ -143,12 +143,174 @@ function ModalRegistrarPago({ gasto, onClose, onSave }) {
   )
 }
 
+
+// ─── Editor de reparto ────────────────────────────────────────────────────────
+function SplitEditor({ form, set }) {
+  const imp = parseFloat(form.importe) || 0
+  const modoP = form.modo_pablo || 'pct'   // 'pct' | 'fijo'
+  const modoA = form.modo_alberto || 'pct'
+
+  // Calcular importes
+  const calcImporte = (pct, fijo) => {
+    if (form[`modo_${fijo < 0 ? 'pablo' : 'alberto'}`] === 'fijo') return parseFloat(form[`fijo_${fijo < 0 ? 'pablo' : 'alberto'}`]) || 0
+    return imp * (parseFloat(pct) || 0) / 100
+  }
+
+  const impP = form.modo_pablo === 'fijo'
+    ? parseFloat(form.fijo_pablo) || 0
+    : imp * (parseFloat(form.pct_pablo) || 0) / 100
+
+  const impA = form.modo_alberto === 'fijo'
+    ? parseFloat(form.fijo_alberto) || 0
+    : imp * (parseFloat(form.pct_alberto) || 0) / 100
+
+  const personas = [
+    { key: 'pablo', label: 'Pablo', color: '#6366f1' },
+    { key: 'alberto', label: 'Alberto', color: '#06b6d4' },
+  ]
+
+  return (
+    <div style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Reparto del gasto</div>
+        <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)} style={{ width: 180, height: 28, fontSize: 11 }}>
+          <option value="pablo">Lo paga Pablo</option>
+          <option value="alberto">Lo paga Alberto</option>
+          <option value="ambos">Lo pagan ambos</option>
+        </select>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {personas.map(p => {
+          const imputado = form[`imputar_${p.key}`] !== false
+          const modo = form[`modo_${p.key}`] || 'pct'
+          const pct = parseFloat(form[`pct_${p.key}`]) || 0
+          const fijo = parseFloat(form[`fijo_${p.key}`]) || 0
+          const importeCalculado = modo === 'fijo' ? fijo : imp * pct / 100
+
+          return (
+            <div key={p.key} style={{ background: 'var(--bg1)', borderRadius: 10, border: `1px solid ${imputado ? p.color + '40' : 'var(--border)'}`, overflow: 'hidden', transition: 'all 0.2s' }}>
+              {/* Header persona */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: imputado ? p.color + '20' : 'var(--bg4)', color: imputado ? p.color : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                  {p.label[0]}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: imputado ? 'var(--text0)' : 'var(--text3)', flex: 1 }}>{p.label}</span>
+
+                {/* Toggle imputar */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: imputado ? p.color : 'var(--text3)' }}>
+                  <div
+                    onClick={() => set(`imputar_${p.key}`, !imputado)}
+                    style={{ width: 36, height: 20, borderRadius: 10, background: imputado ? p.color : 'var(--bg4)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}
+                  >
+                    <div style={{ position: 'absolute', top: 2, left: imputado ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                  </div>
+                  {imputado ? 'Imputado' : 'No imputar'}
+                </label>
+
+                {/* Importe final */}
+                {imputado && imp > 0 && (
+                  <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--mono)', color: p.color, minWidth: 70, textAlign: 'right' }}>
+                    {formatDec(importeCalculado)}
+                  </span>
+                )}
+              </div>
+
+              {/* Controles (solo si imputado) */}
+              {imputado && (
+                <div style={{ padding: '0 14px 12px', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  {/* Selector modo */}
+                  <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
+                    {['pct', 'fijo'].map(m => (
+                      <button key={m} onClick={() => set(`modo_${p.key}`, m)} style={{ padding: '5px 12px', fontSize: 11, fontWeight: modo === m ? 600 : 400, background: modo === m ? p.color : 'none', color: modo === m ? '#fff' : 'var(--text3)', border: 'none', cursor: 'pointer' }}>
+                        {m === 'pct' ? '%' : '€'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Input */}
+                  {modo === 'pct' ? (
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 3 }}>Porcentaje</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          className="form-input"
+                          type="number" min="0" max="100" step="1"
+                          value={pct}
+                          onChange={e => {
+                            const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+                            set(`pct_${p.key}`, v)
+                            // Auto-ajustar el otro si está en modo pct y ambos imputados
+                            const otro = p.key === 'pablo' ? 'alberto' : 'pablo'
+                            if (form[`imputar_${otro}`] !== false && form[`modo_${otro}`] !== 'fijo') {
+                              set(`pct_${otro}`, Math.round((100 - v) * 10) / 10)
+                            }
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                        <span style={{ fontSize: 12, color: 'var(--text3)' }}>%</span>
+                        {imp > 0 && <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)', whiteSpace: 'nowrap' }}>= {formatDec(imp * pct / 100)}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 3 }}>Cantidad fija</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input
+                          className="form-input"
+                          type="number" min="0" step="0.01"
+                          value={fijo}
+                          onChange={e => set(`fijo_${p.key}`, parseFloat(e.target.value) || 0)}
+                          style={{ flex: 1 }}
+                        />
+                        <span style={{ fontSize: 12, color: 'var(--text3)' }}>€</span>
+                        {imp > 0 && fijo > 0 && <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)', whiteSpace: 'nowrap' }}>{((fijo/imp)*100).toFixed(1)}%</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Resumen total */}
+      {imp > 0 && (
+        <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--bg2)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>Total imputado</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {(() => {
+              const impP2 = form.imputar_pablo !== false ? (form.modo_pablo === 'fijo' ? parseFloat(form.fijo_pablo)||0 : imp * (parseFloat(form.pct_pablo)||0)/100) : 0
+              const impA2 = form.imputar_alberto !== false ? (form.modo_alberto === 'fijo' ? parseFloat(form.fijo_alberto)||0 : imp * (parseFloat(form.pct_alberto)||0)/100) : 0
+              const total2 = impP2 + impA2
+              const diff = imp - total2
+              return <>
+                <span style={{ fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text0)' }}>{formatDec(total2)} / {formatDec(imp)}</span>
+                {Math.abs(diff) > 0.01 && (
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.15)', color: 'var(--amber)' }}>
+                    {diff > 0 ? `${formatDec(diff)} sin imputar` : `${formatDec(Math.abs(diff))} excedido`}
+                  </span>
+                )}
+                {Math.abs(diff) <= 0.01 && <span style={{ fontSize: 11, color: 'var(--green)' }}>✓ Cuadra</span>}
+              </>
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Modal gasto ──────────────────────────────────────────────────────────────
 function ModalGasto({ gasto, onClose, onSave }) {
   const [form, setForm] = useState({
     nombre: '', categoria: 'software', categoria_custom: '', tipo: 'fijo',
     importe: '', frecuencia: 'mensual', dia_cobro: '', activo: true, notas: '',
     pagado_por: 'pablo', pct_pablo: 50, pct_alberto: 50,
+    imputar_pablo: true, imputar_alberto: true,
+    modo_pablo: 'pct', modo_alberto: 'pct',
+    fijo_pablo: 0, fijo_alberto: 0,
     ...gasto,
   })
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
@@ -215,41 +377,7 @@ function ModalGasto({ gasto, onClose, onSave }) {
           )}
 
           {/* Split de pago */}
-          <div style={{ padding: '14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Reparto del gasto</div>
-            <div className="form-group">
-              <label className="form-label">Quién suele pagarlo</label>
-              <select className="form-select" value={form.pagado_por} onChange={e => set('pagado_por', e.target.value)}>
-                <option value="pablo">Pablo</option>
-                <option value="alberto">Alberto</option>
-                <option value="ambos">Ambos (ya dividido)</option>
-              </select>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">% Pablo</label>
-                <input className="form-input" type="number" min="0" max="100" value={form.pct_pablo}
-                  onChange={e => { const v = Math.min(100, Math.max(0, parseFloat(e.target.value)||0)); set('pct_pablo', v); set('pct_alberto', Math.round((100-v)*10)/10) }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">% Alberto</label>
-                <input className="form-input" type="number" min="0" max="100" value={form.pct_alberto}
-                  onChange={e => { const v = Math.min(100, Math.max(0, parseFloat(e.target.value)||0)); set('pct_alberto', v); set('pct_pablo', Math.round((100-v)*10)/10) }} />
-              </div>
-            </div>
-            {form.importe && parseFloat(form.importe) > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                {[{ name: 'Pablo', pct: form.pct_pablo }, { name: 'Alberto', pct: form.pct_alberto }].map(p => (
-                  <div key={p.name} style={{ flex: 1, padding: '8px', background: 'var(--bg1)', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{p.name} ({p.pct}%)</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text0)' }}>
-                      {formatDec((parseFloat(form.importe)||0) * p.pct / 100)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <SplitEditor form={form} set={set} />
 
           <div className="form-group">
             <label className="form-label">Notas <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
