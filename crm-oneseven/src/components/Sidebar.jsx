@@ -16,6 +16,7 @@ const navItems = [
   { path: '/contabilidad', label: 'Contabilidad', icon: ContabilidadIcon },
   { path: '/ingresos', label: 'Ingresos', icon: EuroIcon },
   { path: '/documentos', label: 'Documentos', icon: DocIcon },
+  { path: '/configuracion', label: 'Configuracion', icon: ConfiguracionIcon },
   { path: '/objetivos', label: 'Objetivos', icon: TargetIcon },
 ]
 
@@ -25,6 +26,7 @@ function PeopleIcon() { return <svg width="16" height="16" viewBox="0 0 16 16" f
 function TaskIcon() { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><path d="M6 3h8M6 8h8M6 13h5"/><circle cx="3" cy="3" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="3" cy="13" r="1"/></svg> }
 function TimelineIcon() { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><circle cx="4" cy="4" r="1.5"/><circle cx="4" cy="9" r="1.5"/><circle cx="4" cy="14" r="1.5"/><line x1="4" y1="5.5" x2="4" y2="7.5"/><line x1="4" y1="10.5" x2="4" y2="12.5"/><line x1="7" y1="4" x2="14" y2="4"/><line x1="7" y1="9" x2="12" y2="9"/><line x1="7" y1="14" x2="11" y2="14"/></svg> }
 function MetricasIcon() { return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="nav-icon"><polyline points="2,12 6,7 9,10 14,4"/><circle cx="14" cy="4" r="1" fill="currentColor" stroke="none"/></svg> }
+function ConfiguracionIcon() { return <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4'><circle cx='8' cy='8' r='2'/><path d='M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41'/></svg> }
 function SubcontratacionesIcon() { return <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4'><circle cx='5' cy='4' r='2'/><circle cx='11' cy='4' r='2'/><path d='M1 14v-1a4 4 0 0 1 8 0v1'/><path d='M11 8c1.66 0 3 1.12 3 2.5V14'/></svg> }
 function PresupuestosIcon() { return <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4'><rect x='2' y='1' width='12' height='14' rx='1'/><line x1='5' y1='5' x2='11' y2='5'/><line x1='5' y1='8' x2='11' y2='8'/><line x1='5' y1='11' x2='8' y2='11'/><path d='M10 10l1.5 1.5L13 10' strokeWidth='1.3'/></svg> }
 function GastosIcon() { return <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4'><path d='M2 12l3-4 3 2 3-5 3 3'/><rect x='1' y='1' width='14' height='14' rx='1'/></svg> }
