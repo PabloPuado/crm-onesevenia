@@ -2,6 +2,14 @@ import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
 import { useGastos } from '../hooks/useData'
 import { formatEur } from '../lib/constants'
+
+// Sanitize payload — convert empty strings to null (prevents uuid errors in Supabase)
+function sanitize(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === '' || v === undefined ? null : v])
+  )
+}
+
 const formatDec = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(n) || 0)
 
 function PlusIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg> }
