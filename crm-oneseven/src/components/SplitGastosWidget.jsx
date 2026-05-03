@@ -126,10 +126,15 @@ function ModalLiquidacion({ deudor, acreedor, importeSugerido, gastosPendientes,
 }
 
 // ─── Widget principal ──────────────────────────────────────────────────────────
-export default function SplitGastosWidget() {
-  const { gastos } = useGastos()
-  const { pagos, registrar: registrarPago } = usePagosGastos()
-  const { liquidaciones, crear: crearLiquidacion } = useLiquidaciones()
+export default function SplitGastosWidget({ gastosExt, pagosExt, liquidacionesExt, onLiquidacion }) {
+  const { gastos: gastosInt } = useGastos()
+  const { pagos: pagosInt, registrar: registrarPago } = usePagosGastos()
+  const { liquidaciones: liquidacionesInt, crear: crearLiquidacion } = useLiquidaciones()
+  
+  // Use external data if provided (from parent), otherwise use own fetched data
+  const gastos = gastosExt || gastosInt
+  const pagos = pagosExt || pagosInt
+  const liquidaciones = liquidacionesExt || liquidacionesInt
   const [modalLiq, setModalLiq] = useState(false)
   const [verDetalle, setVerDetalle] = useState(false)
 
@@ -210,7 +215,7 @@ export default function SplitGastosWidget() {
         </div>
         <div style={{ display:'flex', gap:8 }}>
           {deudorFinal && tienePagos && (
-            <button className="btn btn-ghost btn-sm" onClick={() => setModalLiq(true)} style={{ gap:4, color:'var(--green)', fontSize:11 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { if(onLiquidacion) onLiquidacion(); else setModalLiq(true) }} style={{ gap:4, color:'var(--green)', fontSize:11 }}>
               ✓ Liquidar
             </button>
           )}
