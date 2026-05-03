@@ -194,10 +194,14 @@ export default function SplitGastosWidget({ gastosExt, pagosExt, liquidacionesEx
   const pendPA = gastosPendientes.filter(g=>g.deudor==='Pablo').reduce((s,g)=>s+g.pendiente,0)
   const liqAP = liquidaciones.filter(l=>l.pagador==='alberto').reduce((s,l)=>s+(parseFloat(l.importe)||0),0)
   const liqPA = liquidaciones.filter(l=>l.pagador==='pablo').reduce((s,l)=>s+(parseFloat(l.importe)||0),0)
-  const netoAP = pendAP - liqAP, netoPA = pendPA - liqPA
+  // Neto: restar lo que cada uno debe al otro + liquidaciones ya hechas
+  // Alberto→Pablo bruto, menos lo que Pablo debe a Alberto, menos lo que Alberto ya liquidó
+  const brutoAP = pendAP - liqAP   // cuánto debe Alberto a Pablo (bruto)
+  const brutoPA = pendPA - liqPA   // cuánto debe Pablo a Alberto (bruto)
+  const neto = brutoAP - brutoPA   // si positivo → Alberto debe a Pablo; si negativo → Pablo debe a Alberto
   let deudorFinal=null, acreedorFinal=null, cantidadFinal=0
-  if (netoAP > 0.01) { deudorFinal='Alberto'; acreedorFinal='Pablo'; cantidadFinal=netoAP }
-  else if (netoPA > 0.01) { deudorFinal='Pablo'; acreedorFinal='Alberto'; cantidadFinal=netoPA }
+  if (neto > 0.01) { deudorFinal='Alberto'; acreedorFinal='Pablo'; cantidadFinal=neto }
+  else if (neto < -0.01) { deudorFinal='Pablo'; acreedorFinal='Alberto'; cantidadFinal=Math.abs(neto) }
 
   const handleLiquidacion = async (items) => {
     for (const item of items) {
