@@ -465,3 +465,46 @@ export function useLiquidaciones() {
   }
   return { liquidaciones, loading, fetch, crear }
 }
+
+// ─── Facturas de gastos ───────────────────────────────────────────────────────
+export function useFacturasGastos() {
+  const [facturas, setFacturas] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('facturas_gastos').select('*').order('created_at', { ascending: false })
+    setFacturas(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { fetch() }, [fetch])
+
+  const subir = async (gastoId, file) => {
+    const ext = file.name.split('.').pop()
+    const path = `facturas/${gastoId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { error: upErr } = await supabase.storage.from('documentos').upload(path, file)
+    if (upErr) return { error: upErr }
+    const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
+    const { error } = await supabase.from('facturas_gastos').insert([sanitize({
+      gasto_id: gastoId,
+      nombre: file.name,
+      url: publicUrl,
+      storage_path: path,
+      tamano: file.size,
+      tipo: ext,
+    })])
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+
+  const eliminar = async (id, storagePath) => {
+    if (storagePath) await supabase.storage.from('documentos').remove([storagePath])
+    const { error } = await supabase.from('facturas_gastos').delete().eq('id', id)
+    if (error) return { error }
+    await fetch()
+    return { error: null }
+  }
+
+  return { facturas, loading, fetch, subir, eliminar }
+}
