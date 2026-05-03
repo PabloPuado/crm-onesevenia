@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
 import { useGastos, usePagosGastos, useLiquidaciones, useFacturasGastos } from '../hooks/useData'
 import SplitGastosWidget from '../components/SplitGastosWidget'
@@ -921,6 +921,49 @@ function ModalCalendarioGastos({ gastos, onClose }) {
   )
 }
 
+
+// ─── Subcomponente facturas por gasto ─────────────────────────────────────────
+function FacturasGasto({ gastoId, facturas, subirFactura, eliminarFactura }) {
+  const [subiendo, setSubiendo] = useState(false)
+  const facturasGasto = facturas.filter(f => f.gasto_id === gastoId)
+
+  return (
+    <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: facturasGasto.length > 0 ? 8 : 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          Facturas adjuntas ({facturasGasto.length})
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', cursor: subiendo ? 'wait' : 'pointer', fontSize: 11, color: 'var(--accent2)', fontWeight: 500 }}>
+          <UploadIcon /> {subiendo ? 'Subiendo...' : 'Adjuntar factura'}
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: 'none' }} disabled={subiendo} onChange={async e => {
+            const file = e.target.files[0]
+            if (!file) return
+            setSubiendo(true)
+            await subirFactura(gastoId, file)
+            setSubiendo(false)
+            e.target.value = ''
+          }} />
+        </label>
+      </div>
+      {facturasGasto.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {facturasGasto.map(f => (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 6 }}>
+              <FileIcon />
+              <span style={{ fontSize: 12, color: 'var(--text1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre}</span>
+              <span style={{ fontSize: 10, color: 'var(--text3)' }}>{f.tamano ? `${(f.tamano/1024).toFixed(0)} KB` : ''}</span>
+              <a href={f.url} target="_blank" rel="noopener noreferrer" download style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent2)', textDecoration: 'none', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)' }}>
+                <DownloadIcon /> Ver / Descargar
+              </a>
+              <button className="btn-icon" style={{ width: 24, height: 24, color: 'var(--red)', flexShrink: 0 }} onClick={() => eliminarFactura(f.id, f.storage_path)} title="Eliminar factura"><TrashIcon /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Gastos() {
   const { gastos, crear, actualizar, eliminar } = useGastos()
   const { pagos, registrar: registrarPago, eliminar: eliminarPago } = usePagosGastos()
@@ -1263,45 +1306,7 @@ export default function Gastos() {
                         </div>
                       )}
                       {/* Facturas adjuntas */}
-                      {(() => {
-                        const facturasGasto = facturas.filter(f => f.gasto_id === g.id)
-                        const [subiendo, setSubiendo] = React.useState(false)
-                        return (
-                          <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: facturasGasto.length > 0 ? 8 : 0 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                                Facturas adjuntas ({facturasGasto.length})
-                              </div>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', cursor: subiendo ? 'wait' : 'pointer', fontSize: 11, color: 'var(--accent2)', fontWeight: 500 }}>
-                                <UploadIcon /> {subiendo ? 'Subiendo...' : 'Adjuntar factura'}
-                                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: 'none' }} disabled={subiendo} onChange={async e => {
-                                  const file = e.target.files[0]
-                                  if (!file) return
-                                  setSubiendo(true)
-                                  await subirFactura(g.id, file)
-                                  setSubiendo(false)
-                                  e.target.value = ''
-                                }} />
-                              </label>
-                            </div>
-                            {facturasGasto.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                {facturasGasto.map(f => (
-                                  <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 6 }}>
-                                    <FileIcon />
-                                    <span style={{ fontSize: 12, color: 'var(--text1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre}</span>
-                                    <span style={{ fontSize: 10, color: 'var(--text3)' }}>{f.tamano ? `${(f.tamano/1024).toFixed(0)} KB` : ''}</span>
-                                    <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent2)', textDecoration: 'none', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)' }}>
-                                      <DownloadIcon /> Ver / Descargar
-                                    </a>
-                                    <button className="btn-icon" style={{ width: 24, height: 24, color: 'var(--red)', flexShrink: 0 }} onClick={() => eliminarFactura(f.id, f.storage_path)} title="Eliminar factura"><TrashIcon /></button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
+                      <FacturasGasto gastoId={g.id} facturas={facturas} subirFactura={subirFactura} eliminarFactura={eliminarFactura} />
 
                       {/* Split esperado */}
                       <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
