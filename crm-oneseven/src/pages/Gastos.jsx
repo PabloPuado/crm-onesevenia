@@ -1161,7 +1161,7 @@ export default function Gastos() {
         ))}
       </div>
 
-      <SplitGastosWidget onLiquidacion={() => setLiquidacionModal(true)} />
+      <SplitGastosWidget gastosExt={gastos} pagosExt={pagos} liquidacionesExt={liquidaciones} onLiquidacion={() => setLiquidacionModal(true)} />
       {/* Gráficos */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div className="card">
