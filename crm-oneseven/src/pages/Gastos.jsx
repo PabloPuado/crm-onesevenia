@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import Layout from '../components/Layout'
-import { useGastos, usePagosGastos, useLiquidaciones } from '../hooks/useData'
+import { useGastos, usePagosGastos, useLiquidaciones, useFacturasGastos } from '../hooks/useData'
 import SplitGastosWidget from '../components/SplitGastosWidget'
 import { formatEur, formatDate } from '../lib/constants'
 
@@ -97,6 +97,9 @@ function CloseIcon() { return <svg width="14" height="14" viewBox="0 0 14 14" fi
 function CheckIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6.5l4 4 5-6"/></svg> }
 function ChevronIcon({ open }) { return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><path d="M3 5l4 4 4-4"/></svg> }
 function CalendarIcon() { return <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="2" width="12" height="11" rx="1"/><path d="M1 6h12M5 1v2M9 1v2"/></svg> }
+function UploadIcon() { return <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 9V1M4 4l3-3 3 3"/><path d="M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/></svg> }
+function DownloadIcon() { return <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 5v8M4 10l3 3 3-3"/><path d="M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/></svg> }
+function FileIcon() { return <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 1H3a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V5L8 1z"/><path d="M8 1v4h4"/></svg> }
 function ShareIcon() { return <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 1l3 3-3 3M12 4H5a4 4 0 0 0 0 8h1"/></svg> }
 
 const CATEGORIAS = ['software', 'marketing', 'personal', 'oficina', 'servicios', 'infraestructura', 'formacion', 'legal', 'bancario', 'otros']
@@ -921,6 +924,7 @@ function ModalCalendarioGastos({ gastos, onClose }) {
 export default function Gastos() {
   const { gastos, crear, actualizar, eliminar } = useGastos()
   const { pagos, registrar: registrarPago, eliminar: eliminarPago } = usePagosGastos()
+  const { facturas, subir: subirFactura, eliminar: eliminarFactura } = useFacturasGastos()
   const { liquidaciones, crear: crearLiquidacion } = useLiquidaciones()
   const [modal, setModal] = useState(null)
   const [pagoModal, setPagoModal] = useState(null)
@@ -1258,6 +1262,47 @@ export default function Gastos() {
                           ))}
                         </div>
                       )}
+                      {/* Facturas adjuntas */}
+                      {(() => {
+                        const facturasGasto = facturas.filter(f => f.gasto_id === g.id)
+                        const [subiendo, setSubiendo] = React.useState(false)
+                        return (
+                          <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: facturasGasto.length > 0 ? 8 : 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                Facturas adjuntas ({facturasGasto.length})
+                              </div>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', cursor: subiendo ? 'wait' : 'pointer', fontSize: 11, color: 'var(--accent2)', fontWeight: 500 }}>
+                                <UploadIcon /> {subiendo ? 'Subiendo...' : 'Adjuntar factura'}
+                                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: 'none' }} disabled={subiendo} onChange={async e => {
+                                  const file = e.target.files[0]
+                                  if (!file) return
+                                  setSubiendo(true)
+                                  await subirFactura(g.id, file)
+                                  setSubiendo(false)
+                                  e.target.value = ''
+                                }} />
+                              </label>
+                            </div>
+                            {facturasGasto.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {facturasGasto.map(f => (
+                                  <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 6 }}>
+                                    <FileIcon />
+                                    <span style={{ fontSize: 12, color: 'var(--text1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nombre}</span>
+                                    <span style={{ fontSize: 10, color: 'var(--text3)' }}>{f.tamano ? `${(f.tamano/1024).toFixed(0)} KB` : ''}</span>
+                                    <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent2)', textDecoration: 'none', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)' }}>
+                                      <DownloadIcon /> Ver / Descargar
+                                    </a>
+                                    <button className="btn-icon" style={{ width: 24, height: 24, color: 'var(--red)', flexShrink: 0 }} onClick={() => eliminarFactura(f.id, f.storage_path)} title="Eliminar factura"><TrashIcon /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
                       {/* Split esperado */}
                       <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                         {[{ name: 'Pablo', key: 'pablo' }, { name: 'Alberto', key: 'alberto' }].map(p => {
