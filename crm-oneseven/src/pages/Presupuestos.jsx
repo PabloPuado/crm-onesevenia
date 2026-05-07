@@ -149,9 +149,27 @@ function generarHTMLPresupuesto({ p, cliente, empresa }) {
 </div></div></body></html>`
 }
 
-function abrirPresupuesto({ p, cliente, empresa }) {
+async function imgToBase64(url) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.onerror = () => resolve(url) // fallback to original url
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return url
+  }
+}
+
+async function abrirPresupuesto({ p, cliente, empresa }) {
+  const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
+  const logoBase64 = await imgToBase64(logoUrl)
+  const empresaConLogo = { ...empresa, logo_url: logoBase64 }
   const win = window.open('', '_blank')
-  win.document.write(generarHTMLPresupuesto({ p, cliente, empresa }))
+  win.document.write(generarHTMLPresupuesto({ p, cliente, empresa: empresaConLogo }))
   win.document.close()
 }
 
@@ -399,7 +417,7 @@ ${empresa?.nombre || 'ONESEVEN IA'} - ${empresa?.web || 'onesevenia.com'}`
           <button onClick={onClose} style={{ background: 'var(--bg3)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CloseIcon /></button>
         </div>
         <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <button onClick={() => abrirPresupuesto({ p: presupuesto, cliente, empresa })} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+          <button onClick={async () => { await abrirPresupuesto({ p: presupuesto, cliente, empresa }) }} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}><DownloadIcon /></div>
             <div><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Ver presupuesto PDF</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Abre el PDF con datos completos · guarda desde la ventana</div></div>
           </button>
@@ -568,7 +586,7 @@ export default function Presupuestos() {
                   {total > 0 && <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--green)', marginRight: 4 }}>{formatEur(total)}</span>}
                   {cliente?.telefono && <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviando(p)}><WAIcon /></button>}
                   {cliente?.email && <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent2)', borderRadius: 8, border: '1px solid var(--accent-dim)', background: 'var(--accent-dim)' }} onClick={() => setEnviando(p)}><MailIcon /></button>}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => abrirPresupuesto({ p, cliente, empresa })}><DownloadIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { await abrirPresupuesto({ p, cliente, empresa }) }}><DownloadIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { setEditando(p); setVista('form') }}><EditIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { const { id, created_at, enviado_wa, enviado_email, fecha_envio, ...d } = p; await crear({ ...d, titulo: p.titulo + ' (copia)', estado: 'borrador', fecha: new Date().toISOString().split('T')[0] }) }}><CopyIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--red)' }} onClick={() => setConfirmDelete(p)}><TrashIcon /></button>
