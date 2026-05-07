@@ -979,8 +979,34 @@ export default function Gastos() {
   const [verHistorial, setVerHistorial] = useState(null)
   const [reembolsoModal, setReembolsoModal] = useState(null)
   const [calendarioModal, setCalendarioModal] = useState(false)
+  const [mesVista, setMesVista] = useState({ mes: new Date().getMonth(), ano: new Date().getFullYear() })
 
-  const activos = gastos.filter(g => g.activo !== false)
+  const esHoy = mesVista.mes === new Date().getMonth() && mesVista.ano === new Date().getFullYear()
+  const irMes = (delta) => setMesVista(prev => {
+    let m = prev.mes + delta, a = prev.ano
+    if (m > 11) { m = 0; a++ }
+    if (m < 0) { m = 11; a-- }
+    return { mes: m, ano: a }
+  })
+  const MESES_NAV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+  // Gastos del mes visible:
+  // - recurrentes (mensual/trimestral/semestral/anual/fijo): siempre presentes
+  // - variables y únicos: solo si fecha_cobro cae en ese mes/año
+  const gastosDelMes = gastos.filter(g => {
+    const freq = g.frecuencia
+    if (freq === 'mensual' || freq === 'fijo') return true
+    if (freq === 'trimestral' || freq === 'semestral' || freq === 'anual') return true
+    // variable y unico: por fecha_cobro
+    if (!g.fecha_cobro) {
+      // sin fecha: mostrar solo en mes actual
+      return esHoy
+    }
+    const fc = new Date(g.fecha_cobro + 'T12:00:00')
+    return fc.getMonth() === mesVista.mes && fc.getFullYear() === mesVista.ano
+  })
+
+  const activos = gastosDelMes.filter(g => g.activo !== false)
 
   // ── Cálculos KPI ────────────────────────────────────────────────────────────
   const totalMensual = activos.reduce((s, g) => s + importeMensual(g), 0)
@@ -988,9 +1014,11 @@ export default function Gastos() {
   const totalFijo = activos.filter(g => g.tipo === 'fijo').reduce((s, g) => s + importeMensual(g), 0)
   const totalVariable = activos.filter(g => g.tipo === 'variable').reduce((s, g) => s + importeMensual(g), 0)
 
-  // Total pagado por cada uno (pagos registrados reales)
-  const totalPagadoP = pagos.filter(p => p.pagado_por === 'pablo').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
-  const totalPagadoA = pagos.filter(p => p.pagado_por === 'alberto').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
+  // Total pagado por cada uno — filtrado por mes visible
+  const mesKey = `${mesVista.ano}-${String(mesVista.mes + 1).padStart(2,'0')}`
+  const pagosMes = pagos.filter(p => !p.periodo || p.periodo.startsWith(mesKey) || p.tipo === 'reembolso')
+  const totalPagadoP = pagosMes.filter(p => p.pagado_por === 'pablo' && p.tipo !== 'reembolso').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
+  const totalPagadoA = pagosMes.filter(p => p.pagado_por === 'alberto' && p.tipo !== 'reembolso').reduce((s, p) => s + (parseFloat(p.importe) || 0), 0)
 
   // Lo que debería pagar cada uno según % (mensual)
   // Calcular lo que debería pagar cada uno respetando imputar y modo fijo/pct
@@ -1028,7 +1056,7 @@ export default function Gastos() {
   // Gastos del mes pendientes de confirmar pago
   const pendientesMes = activos.filter(g => {
     if (g.frecuencia !== 'mensual') return false
-    const yaRegistrado = pagos.some(p => p.gasto_id === g.id && p.periodo?.startsWith(`${ANO_ACTUAL}-${String(MES_ACTUAL).padStart(2,'0')}`))
+    const yaRegistrado = pagos.some(p => p.gasto_id === g.id && p.periodo?.startsWith(mesKey))
     return !yaRegistrado
   })
 
@@ -1058,11 +1086,11 @@ export default function Gastos() {
   const maxCat = Math.max(...porCategoria.map(d => d.valor), 1)
 
   const gastosFiltrados = useMemo(() => {
-    let lista = [...gastos]
+    let lista = [...gastosDelMes]
     if (filtroTipo !== 'todos') lista = lista.filter(g => g.tipo === filtroTipo)
     if (filtroCat) lista = lista.filter(g => g.categoria === filtroCat)
     return lista
-  }, [gastos, filtroTipo, filtroCat])
+  }, [gastosDelMes, filtroTipo, filtroCat])
 
   const handleSave = async (form) => {
     if (form.id) await actualizar(form.id, form)
@@ -1073,7 +1101,7 @@ export default function Gastos() {
   // Resumen para compartir por WA
   const generarResumenWA = () => {
     const lines = [
-      `*Resumen gastos ${MES_LABEL} ${ANO_ACTUAL}*`,
+      `*Resumen gastos ${MESES_NAV[mesVista.mes]} ${mesVista.ano}*`,
       ``,
       `Total mensual: ${formatDec(totalMensual)}`,
       `Pablo pagado: ${formatDec(totalPagadoP)} | Debería: ${formatDec(deberiaP)}`,
@@ -1088,13 +1116,29 @@ export default function Gastos() {
   }
 
   return (
-    <Layout title="Gastos empresa" subtitle="Control de costes y reparto" actions={
+    <Layout title="Gastos empresa" subtitle={`${MESES_NAV[mesVista.mes]} ${mesVista.ano} — control de costes`} actions={
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => setCalendarioModal(true)} style={{ gap: 5 }} title="Ver calendario de gastos"><CalendarIcon /> Calendario</button>
         <button className="btn btn-ghost btn-sm" onClick={generarResumenWA} style={{ gap: 5 }}><ShareIcon /> Resumen</button>
         <button className="btn btn-primary" onClick={() => setModal({})}><PlusIcon /> Nuevo gasto</button>
       </div>
     }>
+
+      {/* Navegación mensual */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, background:'var(--bg2)', borderRadius:'var(--radius)', padding:'10px 16px', border:'1px solid var(--border)' }}>
+        <button onClick={() => irMes(-1)} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:8, padding:'6px 14px', cursor:'pointer', color:'var(--text1)', fontSize:16, lineHeight:1 }}>‹</button>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:16, fontWeight:700, color:'var(--text0)' }}>
+            {MESES_NAV[mesVista.mes].toUpperCase()} {mesVista.ano}
+          </div>
+          {!esHoy && (
+            <button onClick={() => setMesVista({ mes: new Date().getMonth(), ano: new Date().getFullYear() })} style={{ fontSize:11, color:'var(--accent2)', background:'none', border:'none', cursor:'pointer', marginTop:2 }}>
+              Volver al mes actual
+            </button>
+          )}
+        </div>
+        <button onClick={() => irMes(1)} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:8, padding:'6px 14px', cursor:'pointer', color:'var(--text1)', fontSize:16, lineHeight:1 }}>›</button>
+      </div>
 
       {/* Alerta pendientes del mes */}
       {pendientesMes.length > 0 && (
@@ -1161,7 +1205,7 @@ export default function Gastos() {
         ))}
       </div>
 
-      <SplitGastosWidget gastosExt={gastos} pagosExt={pagos} liquidacionesExt={liquidaciones} onLiquidacion={() => setLiquidacionModal(true)} />
+      <SplitGastosWidget gastosExt={gastosDelMes} pagosExt={pagos} liquidacionesExt={liquidaciones} onLiquidacion={() => setLiquidacionModal(true)} />
       {/* Gráficos */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div className="card">
