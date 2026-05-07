@@ -484,7 +484,12 @@ ${empresa?.nombre || 'ONESEVEN IA'} - ${empresa?.web || 'onesevenia.com'}`
         </div>
         <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Ver PDF */}
-          <button onClick={() => { const w = window.open('', '_blank'); w.document.write(generarContrato({ s: sub, empresa })); w.document.close() }} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+          <button onClick={async () => {
+      const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
+      let logoB64 = logoUrl
+      try { const r = await fetch(logoUrl); const b = await r.blob(); logoB64 = await new Promise(res => { const fr = new FileReader(); fr.onloadend = () => res(fr.result); fr.readAsDataURL(b) }) } catch {}
+      const w = window.open('', '_blank'); w.document.write(generarContrato({ s: sub, empresa: {...empresa, logo_url: logoB64} })); w.document.close()
+    }} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}><DocIcon /></div>
             <div><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text0)' }}>Ver contrato PDF</div><div style={{ fontSize: 12, color: 'var(--text3)' }}>Abre y guarda el contrato completo</div></div>
           </button>
@@ -675,7 +680,12 @@ export default function Subcontrataciones() {
                     </div>
                   )}
                   {/* Ver contrato */}
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { const w = window.open('', '_blank'); w.document.write(generarContrato({ s, empresa })); w.document.close() }} title="Ver contrato PDF"><DocIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { 
+      const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
+      let logoB64 = logoUrl
+      try { const r = await fetch(logoUrl); const b = await r.blob(); logoB64 = await new Promise(res => { const fr = new FileReader(); fr.onloadend = () => res(fr.result); fr.readAsDataURL(b) }) } catch {}
+      const w = window.open('', '_blank'); w.document.write(generarContrato({ s, empresa: {...empresa, logo_url: logoB64} })); w.document.close()
+    }} title="Ver contrato PDF"><DocIcon /></button>
                   {/* Enviar contrato */}
                   <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviandoContrato(s)} title="Enviar contrato"><WAIcon /></button>
                   {/* Editar */}
