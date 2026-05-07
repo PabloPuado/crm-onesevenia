@@ -149,25 +149,62 @@ function generarHTMLPresupuesto({ p, cliente, empresa }) {
 </div></div></body></html>`
 }
 
+function imgToBase64InPage(url) {
+  return new Promise((resolve) => {
+    if (!url) { resolve(null); return }
+    // Create image in current page context (not new window)
+    const img = document.createElement('img')
+    img.crossOrigin = 'use-credentials'
+    img.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px'
+    document.body.appendChild(img)
+    
+    const cleanup = () => { try { document.body.removeChild(img) } catch {} }
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || 200
+        canvas.height = img.naturalHeight || 60
+        canvas.getContext('2d').drawImage(img, 0, 0)
+        cleanup()
+        resolve(canvas.toDataURL('image/png'))
+      } catch {
+        cleanup()
+        resolve(url) // fallback: use URL directly
+      }
+    }
+    img.onerror = () => { 
+      cleanup()
+      // Try without crossOrigin
+      const img2 = new Image()
+      img2.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img2.naturalWidth || 200
+          canvas.height = img2.naturalHeight || 60
+          canvas.getContext('2d').drawImage(img2, 0, 0)
+          resolve(canvas.toDataURL('image/png'))
+        } catch { resolve(url) }
+      }
+      img2.onerror = () => resolve(url)
+      img2.src = url
+    }
+    img.src = url
+  })
+}
+
 async function imgToBase64(url) {
-  try {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result)
-      reader.onerror = () => resolve(url) // fallback to original url
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return url
-  }
+  return imgToBase64InPage(url)
 }
 
 async function abrirPresupuesto({ p, cliente, empresa }) {
-  const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
-  const logoBase64 = await imgToBase64(logoUrl)
-  const empresaConLogo = { ...empresa, logo_url: logoBase64 }
+  // Use stored base64 if available (no CORS issues), otherwise try to convert
+  let logoData = empresa?.logo_base64 || null
+  if (!logoData) {
+    const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
+    logoData = await imgToBase64(logoUrl)
+  }
+  const empresaConLogo = { ...empresa, logo_url: logoData }
   const win = window.open('', '_blank')
   win.document.write(generarHTMLPresupuesto({ p, cliente, empresa: empresaConLogo }))
   win.document.close()
