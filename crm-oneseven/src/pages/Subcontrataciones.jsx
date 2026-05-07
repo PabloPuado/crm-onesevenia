@@ -486,8 +486,15 @@ ${empresa?.nombre || 'ONESEVEN IA'} - ${empresa?.web || 'onesevenia.com'}`
           {/* Ver PDF */}
           <button onClick={async () => {
       const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
-      let logoB64 = logoUrl
-      try { const r = await fetch(logoUrl); const b = await r.blob(); logoB64 = await new Promise(res => { const fr = new FileReader(); fr.onloadend = () => res(fr.result); fr.readAsDataURL(b) }) } catch {}
+      let logoB64 = logoUrl.startsWith('data:') ? logoUrl : await new Promise((resolve) => {
+        const img = document.createElement('img')
+        img.style.cssText = 'position:absolute;left:-9999px;width:1px'
+        document.body.appendChild(img)
+        img.onload = () => { try { const c = document.createElement('canvas'); c.width = img.naturalWidth||200; c.height = img.naturalHeight||60; c.getContext('2d').drawImage(img,0,0); document.body.removeChild(img); resolve(c.toDataURL('image/png')) } catch { try{document.body.removeChild(img)}catch{}; resolve(logoUrl) } }
+        img.onerror = () => { try{document.body.removeChild(img)}catch{}; resolve(logoUrl) }
+        img.crossOrigin = 'use-credentials'
+        img.src = logoUrl
+      })
       const w = window.open('', '_blank'); w.document.write(generarContrato({ s: sub, empresa: {...empresa, logo_url: logoB64} })); w.document.close()
     }} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent2)', flexShrink: 0 }}><DocIcon /></div>
@@ -681,9 +688,16 @@ export default function Subcontrataciones() {
                   )}
                   {/* Ver contrato */}
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { 
-      const logoUrl = empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
-      let logoB64 = logoUrl
-      try { const r = await fetch(logoUrl); const b = await r.blob(); logoB64 = await new Promise(res => { const fr = new FileReader(); fr.onloadend = () => res(fr.result); fr.readAsDataURL(b) }) } catch {}
+      const logoUrl = empresa?.logo_base64 || empresa?.logo_url || 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png'
+      let logoB64 = logoUrl.startsWith('data:') ? logoUrl : await new Promise((resolve) => {
+        const img = document.createElement('img')
+        img.style.cssText = 'position:absolute;left:-9999px;width:1px'
+        document.body.appendChild(img)
+        img.onload = () => { try { const c = document.createElement('canvas'); c.width = img.naturalWidth||200; c.height = img.naturalHeight||60; c.getContext('2d').drawImage(img,0,0); document.body.removeChild(img); resolve(c.toDataURL('image/png')) } catch { try{document.body.removeChild(img)}catch{}; resolve(logoUrl) } }
+        img.onerror = () => { try{document.body.removeChild(img)}catch{}; resolve(logoUrl) }
+        img.crossOrigin = 'use-credentials'
+        img.src = logoUrl
+      })
       const w = window.open('', '_blank'); w.document.write(generarContrato({ s, empresa: {...empresa, logo_url: logoB64} })); w.document.close()
     }} title="Ver contrato PDF"><DocIcon /></button>
                   {/* Enviar contrato */}
