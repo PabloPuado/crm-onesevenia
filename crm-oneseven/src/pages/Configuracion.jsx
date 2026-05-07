@@ -24,6 +24,7 @@ function SeccionEmpresa() {
       nombre: '', cif: '', direccion: '', ciudad: '', cp: '', pais: 'España',
       telefono: '', email: '', web: '', iban: '', banco: '', nota_pie: '',
       logo_url: 'https://onesevenia.com/lovable-uploads/20e6c263-0631-43ca-acf0-a255777708ba.png',
+      logo_base64: null,
       ...config,
     })
   }
@@ -157,6 +158,13 @@ function SeccionEmpresa() {
                     if (upErr) { alert('Error al subir: ' + upErr.message); return }
                     const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
                     set('logo_url', publicUrl)
+                    // También guardar como base64 para usar en PDFs sin CORS
+                    const b64 = await new Promise(res => {
+                      const reader = new FileReader()
+                      reader.onloadend = () => res(reader.result)
+                      reader.readAsDataURL(file)
+                    })
+                    set('logo_base64', b64)
                   } finally {
                     setUploading(false)
                   }
