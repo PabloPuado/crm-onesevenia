@@ -30,13 +30,18 @@ const ESTADO_COLORS = {
   facturado: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', label: 'Facturado' },
 }
 
-function calcTotales({ items, descuento, iva }) {
+function calcTotales({ items, descuento, iva, mantenimiento }) {
   const subtotal = (items || []).reduce((s, it) => s + ((parseFloat(it.cantidad) || 1) * (parseFloat(it.precio_unit) || 0)), 0)
   const desc = subtotal * ((parseFloat(descuento) || 0) / 100)
   const base = subtotal - desc
   const ivaAmt = base * ((parseFloat(iva) || 21) / 100)
   const total = base + ivaAmt
-  return { subtotal, desc, base, ivaAmt, total }
+  // Mantenimiento
+  const mant = mantenimiento || {}
+  const mantBase = parseFloat(mant.precio) || 0
+  const mantIvaAmt = mant.con_iva ? mantBase * ((parseFloat(iva) || 21) / 100) : 0
+  const mantTotal = mantBase + mantIvaAmt
+  return { subtotal, desc, base, ivaAmt, total, mantBase, mantIvaAmt, mantTotal }
 }
 
 // ─── HTML Presupuesto con datos empresa y cliente ─────────────────────────────
@@ -45,7 +50,9 @@ function generarHTMLPresupuesto({ p, cliente, empresa }) {
   const respNombre = p.responsable === 'pablo' ? 'Pablo Puado' : 'Alberto'
   const respEmail = p.responsable === 'pablo' ? (emp.email || 'pablo@onesevenia.com') : 'alberto@onesevenia.com'
   const items = (Array.isArray(p.items) ? p.items : []).filter(it => it.descripcion)
-  const { subtotal, desc, base, ivaAmt, total } = calcTotales({ items, descuento: p.descuento, iva: p.iva })
+  const mant = p.mantenimiento || {}
+  const { subtotal, desc, base, ivaAmt, total, mantBase, mantIvaAmt, mantTotal } = calcTotales({ items, descuento: p.descuento, iva: p.iva, mantenimiento: mant })
+  const tieneMant = mant.activo && mantBase > 0
   const ref = `PRES-${new Date(p.fecha || p.created_at).getFullYear()}-${p.id?.slice(-3).toUpperCase() || '000'}`
   const empDireccion = [emp.direccion, emp.cp, emp.ciudad].filter(Boolean).join(', ')
 
@@ -299,15 +306,19 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
     intro: '',
     condiciones: 'El presupuesto tiene una validez de 15 dias naturales desde su emision.\n\nEl 50% del importe se abona al inicio del proyecto y el 50% restante a la entrega.\n\nPrecios sin IVA. IVA aplicable segun normativa vigente.',
     responsable: 'pablo', estado: 'borrador', descuento: '0', iva: '21',
+    mantenimiento: { activo: false, descripcion: 'Mantenimiento y soporte mensual', detalle: '', precio: '', con_iva: true, notas: '' },
     ...presupuesto,
     items: presupuesto?.items?.length ? presupuesto.items : defaultItems,
+    mantenimiento: presupuesto?.mantenimiento || { activo: false, descripcion: 'Mantenimiento y soporte mensual', detalle: '', precio: '', con_iva: true, notas: '' },
   })
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
   const addItem = () => set('items', [...form.items, { descripcion: '', detalle: '', cantidad: '1', precio_unit: '' }])
   const removeItem = (i) => set('items', form.items.filter((_, idx) => idx !== i))
   const updateItem = (i, k, v) => set('items', form.items.map((item, idx) => idx === i ? { ...item, [k]: v } : item))
-  const { subtotal, desc, base, ivaAmt, total } = calcTotales({ items: form.items, descuento: form.descuento, iva: form.iva })
+  const { subtotal, desc, base, ivaAmt, total, mantBase, mantIvaAmt, mantTotal } = calcTotales({ items: form.items, descuento: form.descuento, iva: form.iva, mantenimiento: form.mantenimiento })
+  const setMant = (k, v) => set('mantenimiento', { ...form.mantenimiento, [k]: v })
+  const tieneMantActivo = form.mantenimiento?.activo && parseFloat(form.mantenimiento?.precio) > 0
 
   // Cliente seleccionado para mostrar datos
   const clienteSeleccionado = clientes.find(c => c.id === form.cliente_id)
@@ -399,6 +410,67 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Mantenimiento mensual */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: form.mantenimiento?.activo ? 14 : 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            Mantenimiento mensual
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: form.mantenimiento?.activo ? 'var(--accent2)' : 'var(--text3)' }}>
+            <div
+              onClick={() => setMant('activo', !form.mantenimiento?.activo)}
+              style={{ width: 40, height: 22, borderRadius: 11, background: form.mantenimiento?.activo ? 'var(--accent)' : 'var(--bg4)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}
+            >
+              <div style={{ position: 'absolute', top: 3, left: form.mantenimiento?.activo ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+            </div>
+            {form.mantenimiento?.activo ? 'Incluido en presupuesto' : 'No incluir'}
+          </label>
+        </div>
+
+        {form.mantenimiento?.activo && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr', gap: '0 12px' }}>
+              <div className="form-group">
+                <label className="form-label">Descripción del mantenimiento</label>
+                <input className="form-input" value={form.mantenimiento?.descripcion || ''} onChange={e => setMant('descripcion', e.target.value)} placeholder="Mantenimiento y soporte mensual" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Detalle <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
+                <input className="form-input" value={form.mantenimiento?.detalle || ''} onChange={e => setMant('detalle', e.target.value)} placeholder="Actualizaciones, soporte técnico, hosting..." />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 12px', alignItems: 'end' }}>
+              <div className="form-group">
+                <label className="form-label">Precio mensual (€, sin IVA)</label>
+                <input className="form-input" type="number" step="0.01" value={form.mantenimiento?.precio || ''} onChange={e => setMant('precio', e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="form-group" style={{ paddingTop: 8 }}>
+                <label className="form-label">¿Incluye IVA?</label>
+                <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
+                  {[{ v: true, label: 'Con IVA' }, { v: false, label: 'Sin IVA' }].map(opt => (
+                    <button key={String(opt.v)} onClick={() => setMant('con_iva', opt.v)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: `1px solid ${form.mantenimiento?.con_iva === opt.v ? 'var(--accent)' : 'var(--border2)'}`, background: form.mantenimiento?.con_iva === opt.v ? 'var(--accent-dim)' : 'none', color: form.mantenimiento?.con_iva === opt.v ? 'var(--accent2)' : 'var(--text3)', cursor: 'pointer', fontSize: 12, fontWeight: form.mantenimiento?.con_iva === opt.v ? 600 : 400 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Preview en tiempo real */}
+              {parseFloat(form.mantenimiento?.precio) > 0 && (
+                <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', textAlign: 'center', marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Total mensual</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent2)' }}>{formatEur(mantTotal)}</div>
+                  {form.mantenimiento?.con_iva && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Base: {formatEur(mantBase)} + IVA {form.iva}%: {formatEur(mantIvaAmt)}</div>}
+                </div>
+              )}
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Notas sobre el mantenimiento <span style={{ fontSize: 10, color: 'var(--text3)' }}>(opcional)</span></label>
+              <input className="form-input" value={form.mantenimiento?.notas || ''} onChange={e => setMant('notas', e.target.value)} placeholder="Condiciones, incluye..." />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Condiciones */}
