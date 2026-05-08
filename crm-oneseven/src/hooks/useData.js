@@ -45,10 +45,14 @@ function makeHook(table, selectQuery = '*', orderCol = 'created_at') {
 
 
 // Sanitize payload — converts empty strings to null to prevent Supabase uuid/type errors
+// Does NOT touch arrays, objects, booleans or numbers — only empty strings
 function sanitize(obj) {
   if (!obj || typeof obj !== 'object') return obj
   return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, v === '' || v === undefined ? null : v])
+    Object.entries(obj).map(([k, v]) => {
+      if (v === '' || v === undefined) return [k, null]
+      return [k, v]
+    })
   )
 }
 
