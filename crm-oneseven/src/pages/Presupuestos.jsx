@@ -306,7 +306,6 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
     intro: '',
     condiciones: 'El presupuesto tiene una validez de 15 dias naturales desde su emision.\n\nEl 50% del importe se abona al inicio del proyecto y el 50% restante a la entrega.\n\nPrecios sin IVA. IVA aplicable segun normativa vigente.',
     responsable: 'pablo', estado: 'borrador', descuento: '0', iva: '21',
-    mantenimiento: { activo: false, descripcion: 'Mantenimiento y soporte mensual', detalle: '', precio: '', con_iva: true, notas: '' },
     ...presupuesto,
     items: presupuesto?.items?.length ? presupuesto.items : defaultItems,
     mantenimiento: presupuesto?.mantenimiento || { activo: false, descripcion: 'Mantenimiento y soporte mensual', detalle: '', precio: '', con_iva: true, notas: '' },
@@ -357,8 +356,8 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '0 12px' }}>
           <div className="form-group"><label className="form-label">Fecha</label><input className="form-input" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} /></div>
           <div className="form-group"><label className="form-label">Validez (dias)</label><input className="form-input" type="number" value={form.validez} onChange={e => set('validez', e.target.value)} /></div>
-          <div className="form-group"><label className="form-label">IVA (%)</label><input className="form-input" type="number" value={form.iva} onChange={e => set('iva', e.target.value)} /></div>
-          <div className="form-group"><label className="form-label">Descuento (%)</label><input className="form-input" type="number" value={form.descuento} onChange={e => set('descuento', e.target.value)} /></div>
+          <div className="form-group"><label className="form-label">IVA (%)</label><input className="form-input" type="number" step="any" value={form.iva} onChange={e => set('iva', e.target.value)} /></div>
+          <div className="form-group"><label className="form-label">Descuento (%)</label><input className="form-input" type="number" step="any" value={form.descuento} onChange={e => set('descuento', e.target.value)} /></div>
           <div className="form-group"><label className="form-label">Estado</label><select className="form-select" value={form.estado} onChange={e => set('estado', e.target.value)}>{Object.entries(ESTADO_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
@@ -387,8 +386,8 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 120px 32px', gap: '0 8px', marginBottom: 7, alignItems: 'center' }}>
             <input className="form-input" value={item.descripcion} onChange={e => updateItem(i, 'descripcion', e.target.value)} placeholder="Nombre del servicio" />
             <input className="form-input" value={item.detalle || ''} onChange={e => updateItem(i, 'detalle', e.target.value)} placeholder="Detalle adicional" />
-            <input className="form-input" type="number" value={item.cantidad || '1'} onChange={e => updateItem(i, 'cantidad', e.target.value)} min="1" />
-            <input className="form-input" type="number" value={item.precio_unit || ''} onChange={e => updateItem(i, 'precio_unit', e.target.value)} placeholder="0" />
+            <input className="form-input" type="number" step="1" min="1" value={item.cantidad || '1'} onChange={e => updateItem(i, 'cantidad', e.target.value)} />
+            <input className="form-input" type="text" inputMode="decimal" value={item.precio_unit || ''} onChange={e => updateItem(i, 'precio_unit', e.target.value)} placeholder="0.00" />
             <button className="btn-icon" style={{ width: 32, height: 36, color: 'var(--red)' }} onClick={() => form.items.length > 1 && removeItem(i)}><TrashIcon /></button>
           </div>
         ))}
