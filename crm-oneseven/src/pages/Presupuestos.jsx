@@ -145,6 +145,38 @@ function generarHTMLPresupuesto({ p, cliente, empresa }) {
     ${emp.iban ? `<div class="iban-box">Datos bancarios para el pago &mdash; ${emp.iban}${emp.banco ? ' &mdash; ' + emp.banco : ''}</div>` : ''}
   </div>
 
+  ${tieneMant ? `
+  <div class="section" style="margin-top:8px">
+    <div class="st">Mantenimiento mensual</div>
+    <table>
+      <thead><tr>
+        <th style="width:55%">Descripcion</th>
+        <th class="tc" style="width:15%">Frecuencia</th>
+        <th style="text-align:right;width:15%">Base</th>
+        <th style="text-align:right;width:15%">Total/mes</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="in">${mant.descripcion || 'Mantenimiento y soporte mensual'}</div>
+            ${mant.detalle ? `<div class="id">${mant.detalle}</div>` : ''}
+          </td>
+          <td class="tc"><span style="background:#f0f0ff;color:#6366f1;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Mensual</span></td>
+          <td class="ip">${formatEur(mantBase)}</td>
+          <td class="ip">${formatEur(mantTotal)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="totals-box">
+      <div class="t-row"><span>Base mantenimiento/mes</span><span>${formatEur(mantBase)}</span></div>
+      ${mant.con_iva ? `<div class="t-row"><span>IVA (${p.iva || 21}%)</span><span>${formatEur(mantIvaAmt)}</span></div>` : '<div class="t-row"><span>IVA</span><span>Exento</span></div>'}
+      <div class="t-row total-row"><span>TOTAL MENSUAL</span><span>${formatEur(mantTotal)}</span></div>
+    </div>
+    <div style="margin-top:10px;padding:10px 14px;background:#f0f8ff;border-radius:8px;border-left:3px solid #6366f1;font-size:12px;color:#555;line-height:1.7">
+      El mantenimiento se factura mensualmente a partir de la entrega del proyecto.${mant.notas ? ' ' + mant.notas : ''}
+    </div>
+  </div>` : ''}
+
   ${p.condiciones ? `<div class="section"><div class="st">Condiciones</div><div class="cond-box">${p.condiciones}</div></div>` : ''}
   ${emp.nota_pie ? `<div class="section"><p style="font-size:11px;color:#888;text-align:center">${emp.nota_pie}</p></div>` : ''}
 
@@ -443,7 +475,7 @@ function FormularioPresupuesto({ presupuesto, clientes, onSave, onCancel }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 12px', alignItems: 'end' }}>
               <div className="form-group">
                 <label className="form-label">Precio mensual (€, sin IVA)</label>
-                <input className="form-input" type="number" step="0.01" value={form.mantenimiento?.precio || ''} onChange={e => setMant('precio', e.target.value)} placeholder="0.00" />
+                <input className="form-input" type="text" inputMode="decimal" value={form.mantenimiento?.precio || ''} onChange={e => setMant('precio', e.target.value)} placeholder="0.00" />
               </div>
               <div className="form-group" style={{ paddingTop: 8 }}>
                 <label className="form-label">¿Incluye IVA?</label>
