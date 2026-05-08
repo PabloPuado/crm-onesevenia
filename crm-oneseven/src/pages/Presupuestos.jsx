@@ -591,7 +591,7 @@ ${empresa?.nombre || 'ONESEVEN IA'} - ${empresa?.web || 'onesevenia.com'}`
 // ─── Pagina principal ─────────────────────────────────────────────────────────
 export default function Presupuestos() {
   const { clientes } = useClientes()
-  const { presupuestos, crear, actualizar, eliminar } = usePresupuestos()
+  const { presupuestos, crear, actualizar, eliminar, fetch } = usePresupuestos()
   const { config: empresa, guardar: guardarEmpresa } = useEmpresaConfig()
   const [vista, setVista] = useState('lista')
   const [editando, setEditando] = useState(null)
@@ -609,10 +609,34 @@ export default function Presupuestos() {
   }, [presupuestos, busqueda, filtroEstado])
 
   const handleSave = async (form) => {
-    const data = { ...form, items: form.items.filter(it => it.descripcion) }
-    if (editando?.id) await actualizar(editando.id, data)
-    else await crear(data)
-    setVista('lista'); setEditando(null)
+    const data = {
+      cliente_id: form.cliente_id || null,
+      titulo: form.titulo,
+      fecha: form.fecha,
+      validez: form.validez,
+      intro: form.intro || null,
+      items: form.items.filter(it => it.descripcion),
+      descuento: form.descuento,
+      iva: form.iva,
+      condiciones: form.condiciones,
+      responsable: form.responsable,
+      estado: form.estado,
+      mantenimiento: form.mantenimiento || { activo: false },
+    }
+    console.log('[Presupuestos] Saving:', editando?.id ? 'UPDATE' : 'CREATE', data)
+    let result
+    if (editando?.id) {
+      result = await actualizar(editando.id, data)
+    } else {
+      result = await crear(data)
+    }
+    console.log('[Presupuestos] Result:', result)
+    if (result?.error) {
+      alert('Error al guardar: ' + (result.error.message || JSON.stringify(result.error)))
+      return
+    }
+    setVista('lista')
+    setEditando(null)
   }
 
   const handleEnviado = async (tipo) => {
@@ -727,7 +751,7 @@ export default function Presupuestos() {
                   {cliente?.telefono && <button className="btn-icon" style={{ width: 32, height: 32, color: '#25d366', borderRadius: 8, border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)' }} onClick={() => setEnviando(p)}><WAIcon /></button>}
                   {cliente?.email && <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent2)', borderRadius: 8, border: '1px solid var(--accent-dim)', background: 'var(--accent-dim)' }} onClick={() => setEnviando(p)}><MailIcon /></button>}
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { await abrirPresupuesto({ p, cliente, empresa }) }}><DownloadIcon /></button>
-                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={() => { setEditando(p); setVista('form') }}><EditIcon /></button>
+                  <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { await fetch(); setEditando(presupuestos.find(x => x.id === p.id) || p); setVista('form') }}><EditIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--text2)' }} onClick={async () => { const { id, created_at, enviado_wa, enviado_email, fecha_envio, ...d } = p; await crear({ ...d, titulo: p.titulo + ' (copia)', estado: 'borrador', fecha: new Date().toISOString().split('T')[0] }) }}><CopyIcon /></button>
                   <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--red)' }} onClick={() => setConfirmDelete(p)}><TrashIcon /></button>
                 </div>
